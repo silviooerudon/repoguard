@@ -69,6 +69,52 @@ export default async function Home() {
           Read-only access. We never store your code.
         </p>
       </section>
+      {/* HOW IT WORKS */}
+      <section className="border-t border-slate-800/60 bg-slate-900/30">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              How it works
+            </h2>
+            <p className="text-slate-400">
+              Three steps. No setup, no CLI, no config files.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "01",
+                title: "Connect GitHub",
+                desc: "Sign in with OAuth. Read-only access to the repos you choose.",
+              },
+              {
+                step: "02",
+                title: "Run a scan",
+                desc: "Pick a repo. We fetch the file tree and match 16 secret patterns in parallel.",
+              },
+              {
+                step: "03",
+                title: "Review findings",
+                desc: "Results grouped by severity. File path, line number, masked preview.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-950/50"
+              >
+                <div className="text-sm font-mono text-slate-500 mb-3">
+                  {item.step}
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
