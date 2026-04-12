@@ -1,5 +1,6 @@
 import { auth, signOut } from "@/auth"
 import { redirect } from "next/navigation"
+import { fetchUserRepos, type GitHubRepo } from "@/lib/github"
 
 export default async function Dashboard() {
   const session = await auth()
@@ -9,58 +10,148 @@ export default async function Dashboard() {
     redirect("/")
   }
 
+  // @ts-expect-error - accessToken custom field
+  const accessToken = session.accessToken as string | undefined
+
+  let repos: GitHubRepo[] = []
+  let fetchError: string | null = null
+
+  if (accessToken) {
+    try {
+      repos = await fetchUserRepos(accessToken)
+    } catch (error) {
+      fetchError = error instanceof Error ? error.message : "Unknown error"
+    }
+  } else {
+    fetchError = "No access token found in session"
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900 text-white px-6 py-12">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
         <div className="flex items-center justify-between mb-12">
           <h1 className="text-3xl font-bold">
             Repo<span className="text-blue-500">Guard</span>
           </h1>
 
-          <form
-            action={async () => {
-              "use server"
-              await signOut({ redirectTo: "/" })
-            }}
-          >
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 transition text-sm font-medium"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
-          <div className="flex items-center gap-4 mb-6">
-            {session?.user?.image && (
+          <div className="flex items-center gap-4">
+            {session.user?.image && (
               <img
                 src={session.user.image}
                 alt={session.user.name ?? "User"}
-                className="w-16 h-16 rounded-full border-2 border-gray-700"
+                className="w-10 h-10 rounded-full border border-gray-700"
               />
             )}
-            <div>
-              <h2 className="text-2xl font-semibold">
-                Welcome, {session?.user?.name ?? "there"}!
-              </h2>
-              <p className="text-gray-400 text-sm">
-                {session?.user?.email}
-              </p>
-            </div>
-          </div>
+            <span className="text-sm text-gray-400 hidden sm:inline">
+              {session.user?.name}
+            </span>
 
-          <div className="mt-8 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <p className="text-green-400 text-sm">
-              ✅ You are successfully authenticated with GitHub. Next up: repository scanning.
-            </p>
+            <form
+              action={async () => {
+                "use server"
+                await signOut({ redirectTo: "/" })
+              }}
+            >
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 transition text-sm font-medium"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
 
-        <p className="text-center text-gray-600 text-sm mt-8">
-          🚧 This dashboard is a work in progress. Scanning features coming soon.
-        </p>
+        {/* Section title */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-2">Your repositories</h2>
+          <p className="text-gray-400 text-sm">
+            {fetchError
+              ? "Could not load repositories."
+              : `${repos.length} ${repos.length === 1 ? "repository" : "repositories"} found. Select one to scan for security issues.`}
+          </p>
+        </div>
+
+        {/* Error state */}
+        {fetchError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6">
+            <p className="text-red-400 text-sm">⚠️ {fetchError}</p>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!fetchError && repos.length === 0 && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+            <p className="text-gray-400">
+              You don&apos;t have any repositories yet. Create one on GitHub to get started.
+            </p>
+          </div>
+        )}
+
+        {/* Repo list */}
+        {!fetchError && repos.length > 0 && (
+          <div className="grid gap-3">
+            {repos.map((repo) => (
+              <div
+                key={repo.id}
+                className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="font-semibold text-lg truncate">
+                        {repo.name}
+                      </h3>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border ${
+                          repo.private
+                            ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
+                            : "bg-green-500/10 border-green-500/20 text-green-400"
+                        }`}
+                      >
+                        {repo.private ? "Private" : "Public"}
+                      </span>
+                    </div>
+
+                    {repo.description && (
+                      <p className="text-gray-400 text-sm mb-3 line-clamp-2">
+                        {repo.description}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                      {repo.language && (
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-500" />
+                          {repo.language}
+                        </span>
+                      )}
+                      <span>⭐ {repo.stargazers_count}</span>
+                      <span>
+                        Updated{" "}
+                        {new Date(repo.updated_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled
+                    className="shrink-0 px-4 py-2 rounded-lg bg-blue-600/50 text-blue-200 text-sm font-medium cursor-not-allowed"
+                    title="Scanning not implemented yet"
+                  >
+                    Scan
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   )
