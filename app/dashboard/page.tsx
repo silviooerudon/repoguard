@@ -139,14 +139,12 @@ export default async function Dashboard() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled
-                    className="shrink-0 px-4 py-2 rounded-lg bg-blue-600/50 text-blue-200 text-sm font-medium cursor-not-allowed"
-                    title="Scanning not implemented yet"
+                  <a
+                    href={`/dashboard/scan/${repo.owner.login}/${repo.name}?branch=${encodeURIComponent(repo.default_branch)}`}
+                    className="shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition text-white text-sm font-medium"
                   >
                     Scan
-                  </button>
+                  </a>
                 </div>
               </div>
             ))}

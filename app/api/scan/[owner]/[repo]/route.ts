@@ -1,0 +1,67 @@
+import { auth } from "@/auth"
+import { scanRepo } from "@/lib/scan"
+import { NextResponse } from "next/server"
+
+type RouteParams = {
+  params: Promise<{
+    owner: string
+    repo: string
+  }>
+}
+
+export async function POST(
+  request: Request,
+  { params }: RouteParams
+) {
+  // 1. Check authentication
+  const session = await auth()
+  if (!session) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+
+  // @ts-expect-error - accessToken custom field
+  const accessToken = session.accessToken as string | undefined
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: "No access token available. Please sign in again." },
+      { status: 401 }
+    )
+  }
+
+  // 2. Extract route params
+  const { owner, repo } = await params
+
+  // 3. Optional: read default branch from body (sent by the dashboard)
+  let defaultBranch = "main"
+  try {
+    const body = await request.json()
+    if (typeof body?.defaultBranch === "string" && body.defaultBranch.length > 0) {
+      defaultBranch = body.defaultBranch
+    }
+  } catch {
+    // No body or invalid JSON — fall back to "main"
+  }
+
+  // 4. Run the scan
+  try {
+    const result = await scanRepo(accessToken, owner, repo, defaultBranch)
+    return NextResponse.json(result)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      { error: `Scan failed: ${message}` },
+      { status: 500 }
+    )
+  }
+}
+
+// Also allow GET for convenience during development / manual testing
+export async function GET(
+  request: Request,
+  routeCtx: RouteParams
+) {
+  return POST(request, routeCtx)
+}
