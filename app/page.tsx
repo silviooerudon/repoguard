@@ -115,6 +115,89 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      {/* FEATURES */}
+      <section id="features" className="border-t border-slate-800/60">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              What we detect
+            </h2>
+            <p className="text-slate-400">
+              16 curated patterns across the secrets developers leak most.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              {
+                category: "Cloud providers",
+                items: ["AWS Access Keys", "AWS Secret Keys", "Google API Keys"],
+                severity: "critical",
+              },
+              {
+                category: "Developer tools",
+                items: ["GitHub Personal Tokens", "GitHub OAuth Tokens", "NPM Tokens"],
+                severity: "critical",
+              },
+              {
+                category: "Payments & APIs",
+                items: ["Stripe Live Keys", "OpenAI API Keys", "SendGrid Keys"],
+                severity: "high",
+              },
+              {
+                category: "Communications",
+                items: ["Slack Tokens", "Twilio Credentials", "JWT Tokens"],
+                severity: "high",
+              },
+              {
+                category: "Databases",
+                items: ["Connection Strings with Passwords", "MongoDB URIs"],
+                severity: "medium",
+              },
+              {
+                category: "Cryptography",
+                items: ["RSA Private Keys", "SSH Private Keys"],
+                severity: "critical",
+              },
+            ].map((group) => (
+              <div
+                key={group.category}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-900/40"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">{group.category}</h3>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full border font-mono ${
+                      group.severity === "critical"
+                        ? "border-red-900/60 bg-red-950/40 text-red-300"
+                        : group.severity === "high"
+                        ? "border-orange-900/60 bg-orange-950/40 text-orange-300"
+                        : "border-yellow-900/60 bg-yellow-950/40 text-yellow-300"
+                    }`}
+                  >
+                    {group.severity}
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {group.items.map((item) => (
+                    <li
+                      key={item}
+                      className="text-sm text-slate-400 flex items-center gap-2"
+                    >
+                      <span className="w-1 h-1 rounded-full bg-slate-600" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-xs text-slate-500 mt-12">
+            More patterns added regularly based on user reports.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }
