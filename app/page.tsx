@@ -288,6 +288,92 @@ export default async function Home() {
           </p>
         </div>
       </section>
+      {/* FAQ */}
+      <section id="faq" className="border-t border-slate-800/60">
+        <div className="max-w-3xl mx-auto px-6 py-24">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              Frequently asked
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: "Do you store my source code?",
+                a: "No. We fetch files from the GitHub API only during a scan and discard them immediately after. Findings are stored; code is not.",
+              },
+              {
+                q: "What permissions does RepoGuard need?",
+                a: "Read-only access to repository contents and metadata. We never request write access, and we can never modify your code.",
+              },
+              {
+                q: "Can I scan private repositories?",
+                a: "Yes. GitHub OAuth lets you grant access to private repos on a per-account basis.",
+              },
+              {
+                q: "How is this different from GitHub secret scanning?",
+                a: "GitHub's built-in scanning is free but limited to partner patterns. RepoGuard adds curated patterns, severity grouping, and a focused UI for solo devs and small teams.",
+              },
+              {
+                q: "Can I cancel anytime?",
+                a: "Yes. Cancel from your account settings in one click. No phone calls, no dark patterns.",
+              },
+              {
+                q: "Is there a free trial for Pro?",
+                a: "Pro is not yet live. During beta, all features are free. Early users will get a discount when Pro launches.",
+              },
+            ].map((item) => (
+              <details
+                key={item.q}
+                className="group p-5 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-900/60 transition"
+              >
+                <summary className="flex items-center justify-between cursor-pointer font-medium list-none">
+                  <span>{item.q}</span>
+                  <span className="text-slate-500 group-open:rotate-45 transition-transform text-xl leading-none">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm text-slate-400 leading-relaxed">
+                  {item.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t border-slate-800/60 bg-slate-950">
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-xs">
+                R
+              </div>
+              <span className="text-sm text-slate-400">
+                RepoGuard © {new Date().getFullYear()}
+              </span>
+            </div>
+            <div className="flex items-center gap-6 text-sm text-slate-500">
+              <a href="#features" className="hover:text-slate-300 transition">Features</a>
+              <a href="#pricing" className="hover:text-slate-300 transition">Pricing</a>
+              <a href="#faq" className="hover:text-slate-300 transition">FAQ</a>
+              <a
+                href="https://github.com/silviooerudon/repoguard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-slate-300 transition"
+              >
+                GitHub
+              </a>
+            </div>
+          </div>
+          <p className="text-xs text-slate-600 mt-8 text-center md:text-left">
+            Built in Dublin. Not affiliated with GitHub.
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }
