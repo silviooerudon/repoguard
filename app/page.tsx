@@ -198,6 +198,96 @@ export default async function Home() {
           </p>
         </div>
       </section>
+      {/* PRICING */}
+      <section id="pricing" className="border-t border-slate-800/60 bg-slate-900/30">
+        <div className="max-w-5xl mx-auto px-6 py-24">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              Simple pricing
+            </h2>
+            <p className="text-slate-400">
+              Start free. Upgrade when you need more.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {/* FREE */}
+            <div className="p-8 rounded-xl border border-slate-800 bg-slate-950/50">
+              <h3 className="font-semibold mb-1">Free</h3>
+              <p className="text-sm text-slate-500 mb-6">For trying things out</p>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">€0</span>
+                <span className="text-slate-500 text-sm ml-1">/ month</span>
+              </div>
+              <ul className="space-y-3 mb-8 text-sm">
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>1 repository</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>All 16 secret patterns</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>On-demand scans</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-500">
+                  <span className="mt-0.5">—</span>
+                  <span>Scan history</span>
+                </li>
+              </ul>
+              <Link
+                href="/api/auth/signin"
+                className="block text-center px-4 py-2.5 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-900 transition"
+              >
+                Start free
+              </Link>
+            </div>
+
+            {/* PRO */}
+            <div className="p-8 rounded-xl border border-blue-500/40 bg-gradient-to-b from-blue-950/30 to-slate-950/50 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-blue-500 text-xs font-medium text-white">
+                Recommended
+              </div>
+              <h3 className="font-semibold mb-1">Pro</h3>
+              <p className="text-sm text-slate-500 mb-6">For solo devs and small teams</p>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">€9</span>
+                <span className="text-slate-500 text-sm ml-1">/ month</span>
+              </div>
+              <ul className="space-y-3 mb-8 text-sm">
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>Unlimited repositories</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>All 16 secret patterns</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>Scan history</span>
+                </li>
+                <li className="flex items-start gap-2 text-slate-300">
+                  <span className="text-emerald-400 mt-0.5">✓</span>
+                  <span>Email support</span>
+                </li>
+              </ul>
+              <Link
+                href="/api/auth/signin"
+                className="block text-center px-4 py-2.5 rounded-lg bg-slate-100 text-slate-950 font-medium hover:bg-white transition"
+              >
+                Start free trial
+              </Link>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-slate-500 mt-8">
+            Free during beta. Pro plan available soon.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }
