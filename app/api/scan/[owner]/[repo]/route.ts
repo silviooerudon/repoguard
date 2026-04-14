@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { scanRepo } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
+import { supabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -52,10 +53,31 @@ export async function POST(
       scanRepo(accessToken, owner, repo, defaultBranch),
       scanDependencies(owner, repo, accessToken),
     ])
-    return NextResponse.json({
+
+    const fullResult = {
       ...secretsResult,
       dependencies,
+    }
+
+    // 5. Persist scan to Supabase (non-blocking for user response)
+    const userId = session.user?.name ?? session.user?.email ?? "unknown"
+    const { error: dbError } = await supabase.from("scans").insert({
+      user_id: userId,
+      owner,
+      repo,
+      result: fullResult,
+      duration_ms: secretsResult.durationMs,
+      files_scanned: secretsResult.filesScanned,
+      secrets_count: secretsResult.findings.length,
+      deps_count: dependencies.length,
     })
+
+    if (dbError) {
+      console.error("[scan] Failed to persist scan:", dbError.message)
+      // Não falha a resposta pro usuário — scan funcionou, só a persistência falhou
+    }
+
+    return NextResponse.json(fullResult)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
