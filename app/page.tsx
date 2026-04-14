@@ -355,15 +355,40 @@ export default async function Home() {
                 RepoGuard © {new Date().getFullYear()}
               </span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-slate-500">
+            <div className="flex items-center gap-6 text-sm text-slate-500 flex-wrap justify-center">
               <a href="#features" className="hover:text-slate-300 transition">Features</a>
               <a href="#pricing" className="hover:text-slate-300 transition">Pricing</a>
               <a href="#faq" className="hover:text-slate-300 transition">FAQ</a>
+              <Link href="/security" className="hover:text-slate-300 transition">Security</Link>
+              <a
+                href="https://github.com/silviooerudon/repoguard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-slate-300 transition"
+              >
+                GitHub
+              </a>
             </div>
           </div>
-          <p className="text-xs text-slate-600 mt-8 text-center md:text-left">
-            Built in Dublin. Not affiliated with GitHub.
-          </p>
+
+          <div className="mt-8 pt-8 border-t border-slate-800/40 flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-600 text-center md:text-left">
+              Built in Dublin by{" "}
+              <a
+                href="https://www.linkedin.com/in/silvio-junior-de-almeida-gazzoli-78453a8a/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-slate-200 transition underline decoration-slate-700 underline-offset-2"
+              >
+                Silvio Gazzoli
+              </a>
+              {" "}— IAM specialist with 10+ years experience. Not affiliated with GitHub.
+            </p>
+            <span className="text-xs text-slate-600">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5" />
+              Open source
+            </span>
+          </div>
         </div>
       </footer>
     </main>
