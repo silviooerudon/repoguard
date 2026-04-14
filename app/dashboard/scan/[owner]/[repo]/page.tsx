@@ -2,6 +2,9 @@
 
 import { useEffect, useState, use } from "react"
 import type { ScanResult, SecretFinding } from "@/lib/scan"
+import type { DependencyFinding } from "@/lib/types"
+
+type ScanResultWithDeps = ScanResult & { dependencies: DependencyFinding[] }
 
 type PageProps = {
   params: Promise<{
@@ -18,7 +21,7 @@ export default function ScanPage({ params, searchParams }: PageProps) {
   const { branch } = use(searchParams)
 
   const [status, setStatus] = useState<"running" | "done" | "error">("running")
-  const [result, setResult] = useState<ScanResult | null>(null)
+  const [result, setResult] = useState<ScanResultWithDeps | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function ScanPage({ params, searchParams }: PageProps) {
           throw new Error(errorBody.error ?? `Scan failed (${response.status})`)
         }
 
-        const data: ScanResult = await response.json()
+        const data: ScanResultWithDeps = await response.json()
         setResult(data)
         setStatus("done")
       } catch (err) {
@@ -105,8 +108,8 @@ export default function ScanPage({ params, searchParams }: PageProps) {
   )
 }
 
-function ScanResultView({ result }: { result: ScanResult }) {
-  const { findings, filesScanned, filesSkipped, durationMs, truncated } = result
+function ScanResultView({ result }: { result: ScanResultWithDeps }) {
+  const { findings, filesScanned, filesSkipped, durationMs, truncated, dependencies } = result
 
   const critical = findings.filter((f) => f.severity === "critical").length
   const high = findings.filter((f) => f.severity === "high").length
@@ -169,6 +172,91 @@ function ScanResultView({ result }: { result: ScanResult }) {
           ))}
         </div>
       )}
+
+      {/* Dependencies section */}
+      <DependenciesSection dependencies={dependencies ?? []} />
+    </div>
+  )
+}
+
+function DependenciesSection({ dependencies }: { dependencies: DependencyFinding[] }) {
+  if (dependencies.length === 0) {
+    return (
+      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-6 text-center">
+        <p className="text-2xl mb-2">📦</p>
+        <h2 className="text-lg font-semibold text-green-400 mb-1">
+          No vulnerable dependencies
+        </h2>
+        <p className="text-gray-400 text-sm">
+          No known CVEs in your package.json dependencies.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 pt-4">
+      <h2 className="text-xl font-semibold">
+        {dependencies.length} vulnerable{" "}
+        {dependencies.length === 1 ? "dependency" : "dependencies"} found
+      </h2>
+      {dependencies.map((dep, i) => (
+        <DependencyCard key={i} dep={dep} />
+      ))}
+    </div>
+  )
+}
+
+function DependencyCard({ dep }: { dep: DependencyFinding }) {
+  const severityConfig: Record<DependencyFinding["severity"], { label: string; badge: string }> = {
+    critical: { label: "Critical", badge: "bg-red-500/10 border-red-500/20 text-red-400" },
+    high: { label: "High", badge: "bg-orange-500/10 border-orange-500/20 text-orange-400" },
+    moderate: { label: "Moderate", badge: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" },
+    low: { label: "Low", badge: "bg-gray-500/10 border-gray-500/20 text-gray-400" },
+  }
+
+  const config = severityConfig[dep.severity]
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <h3 className="font-semibold font-mono">{dep.package}@{dep.version}</h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${config.badge}`}>
+              {config.label}
+            </span>
+          </div>
+          <p className="text-sm text-gray-400">{dep.title}</p>
+        </div>
+      </div>
+
+      <div className="text-xs space-y-1 bg-black/40 border border-gray-800 rounded-lg p-3">
+        {dep.ghsa && (
+          <div className="text-gray-400">
+            <span className="text-gray-500">Advisory:</span>{" "}
+            <span className="font-mono">{dep.ghsa}</span>
+          </div>
+        )}
+        <div className="text-gray-400">
+          <span className="text-gray-500">Vulnerable versions:</span>{" "}
+          <span className="font-mono text-red-400">{dep.vulnerable_versions}</span>
+        </div>
+        {dep.cvss_score !== null && (
+          <div className="text-gray-400">
+            <span className="text-gray-500">CVSS score:</span>{" "}
+            <span className="font-mono">{dep.cvss_score}</span>
+          </div>
+        )}
+        <a
+          href={dep.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-blue-400 hover:underline mt-1"
+        >
+          View advisory →
+        </a>
+      </div>
     </div>
   )
 }

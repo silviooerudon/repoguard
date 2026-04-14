@@ -57,18 +57,20 @@ export async function scanDependencies(
     for (const adv of advList as Array<{
       severity: string;
       title: string;
-      cves: string[];
       vulnerable_versions: string;
-      patched_versions: string;
       url: string;
+      cvss?: { score?: number };
     }>) {
+      // Extrai GHSA do URL: https://github.com/advisories/GHSA-xxxx-yyyy-zzzz
+      const ghsaMatch = adv.url.match(/GHSA-[\w-]+/);
       findings.push({
         package: pkgName,
         version: auditPayload[pkgName][0],
         severity: adv.severity as DependencyFinding["severity"],
         title: adv.title,
-        cve: adv.cves?.[0] || null,
-        patched_versions: adv.patched_versions,
+        ghsa: ghsaMatch ? ghsaMatch[0] : null,
+        vulnerable_versions: adv.vulnerable_versions,
+        cvss_score: adv.cvss?.score ?? null,
         url: adv.url,
       });
     }
