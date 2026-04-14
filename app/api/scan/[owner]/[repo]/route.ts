@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { scanRepo } from "@/lib/scan"
+import { scanDependencies } from "@/lib/deps"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -45,10 +46,16 @@ export async function POST(
     // No body or invalid JSON — fall back to "main"
   }
 
-  // 4. Run the scan
+  // 4. Run both scans in parallel
   try {
-    const result = await scanRepo(accessToken, owner, repo, defaultBranch)
-    return NextResponse.json(result)
+    const [secretsResult, dependencies] = await Promise.all([
+      scanRepo(accessToken, owner, repo, defaultBranch),
+      scanDependencies(owner, repo, accessToken),
+    ])
+    return NextResponse.json({
+      ...secretsResult,
+      dependencies,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
