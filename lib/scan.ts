@@ -79,7 +79,7 @@ type GitHubTreeResponse = {
  * Main scan entry point.
  */
 export async function scanRepo(
-  accessToken: string,
+  accessToken: string | null,
   owner: string,
   repo: string,
   defaultBranch: string = "main"
@@ -132,7 +132,7 @@ export async function scanRepo(
 }
 
 async function fetchRepoTree(
-  accessToken: string,
+  accessToken: string | null,
   owner: string,
   repo: string,
   branch: string
@@ -140,11 +140,7 @@ async function fetchRepoTree(
   const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`
 
   const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
+    headers: buildGitHubHeaders(accessToken),
     cache: "no-store",
   })
 
@@ -189,7 +185,7 @@ function isScannable(item: GitHubTreeItem): boolean {
 }
 
 async function scanFile(
-  accessToken: string,
+  accessToken: string | null,
   owner: string,
   repo: string,
   file: GitHubTreeItem
@@ -197,11 +193,7 @@ async function scanFile(
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${file.sha}`
     const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
+      headers: buildGitHubHeaders(accessToken),
       cache: "no-store",
     })
 
@@ -278,4 +270,15 @@ function maskLine(line: string, matchedText: string): string {
   // Truncate line if too long
   const replaced = line.replace(matchedText, masked)
   return replaced.length > 200 ? replaced.slice(0, 197) + "..." : replaced.trim()
+}
+
+function buildGitHubHeaders(accessToken: string | null): HeadersInit {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  }
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
+  return headers
 }

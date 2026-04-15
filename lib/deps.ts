@@ -3,17 +3,19 @@ import type { DependencyFinding } from "./types";
 export async function scanDependencies(
   owner: string,
   repo: string,
-  accessToken: string
+  accessToken: string | null
 ): Promise<DependencyFinding[]> {
   // 1. Buscar package.json do repo
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3.raw",
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
   const pkgRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/package.json`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/vnd.github.v3.raw",
-      },
-    }
+    { headers }
   );
 
   if (pkgRes.status === 404) return []; // não é projeto Node
