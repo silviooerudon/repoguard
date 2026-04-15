@@ -79,6 +79,9 @@ export default async function Dashboard() {
               ? "Could not load repositories."
               : `${repos.length} ${repos.length === 1 ? "repository" : "repositories"} found. Select one to scan for security issues.`}
           </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Showing public repositories only. Private repo support coming soon.
+          </p>
         </div>
 
         {/* Error state */}
@@ -107,20 +110,9 @@ export default async function Dashboard() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-semibold text-lg truncate">
-                        {repo.name}
-                      </h3>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full border ${
-                          repo.private
-                            ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-                            : "bg-green-500/10 border-green-500/20 text-green-400"
-                        }`}
-                      >
-                        {repo.private ? "Private" : "Public"}
-                      </span>
-                    </div>
+                    <h3 className="font-semibold text-lg truncate mb-1">
+                      {repo.name}
+                    </h3>
 
                     {repo.description && (
                       <p className="text-gray-400 text-sm mb-3 line-clamp-2">

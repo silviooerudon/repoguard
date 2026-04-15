@@ -17,7 +17,7 @@ export type GitHubRepo = {
 
 export async function fetchUserRepos(accessToken: string): Promise<GitHubRepo[]> {
   const response = await fetch(
-    "https://api.github.com/user/repos?per_page=30&sort=updated&affiliation=owner",
+    "https://api.github.com/user/repos?per_page=30&sort=updated&affiliation=owner&visibility=public",
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
