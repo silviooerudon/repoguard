@@ -105,7 +105,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
 
   return (
     <Link
-      href={`/dashboard/scan/${scan.owner}/${scan.repo}`}
+      href={`/dashboard/scan/view/${scan.id}`}
       className="block bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl p-5 transition"
     >
       <div className="flex items-center justify-between gap-4 flex-wrap">
