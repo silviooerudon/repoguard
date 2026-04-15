@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import PublicScanInput from "./_components/PublicScanInput";
 
 export default async function Home() {
   const session = await auth();
@@ -49,6 +50,14 @@ export default async function Home() {
           16 curated patterns. Zero config. Results in under 60 seconds.
         </p>
 
+        <PublicScanInput />
+
+        <div className="flex items-center justify-center gap-3 text-xs text-slate-500 mb-8">
+          <span className="h-px w-12 bg-slate-800" />
+          <span>or</span>
+          <span className="h-px w-12 bg-slate-800" />
+        </div>
+
         <div className="flex items-center justify-center gap-4">
           <Link
             href="/signin"
@@ -68,6 +77,7 @@ export default async function Home() {
           Read-only access. We never store your code.
         </p>
       </section>
+
       {/* HOW IT WORKS */}
       <section className="border-t border-slate-800/60 bg-slate-900/30">
         <div className="max-w-6xl mx-auto px-6 py-24">
@@ -114,6 +124,7 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
       {/* FEATURES */}
       <section id="features" className="border-t border-slate-800/60">
         <div className="max-w-6xl mx-auto px-6 py-24">
@@ -197,6 +208,7 @@ export default async function Home() {
           </p>
         </div>
       </section>
+
       {/* FAQ */}
       <section id="faq" className="border-t border-slate-800/60">
         <div className="max-w-3xl mx-auto px-6 py-24">
