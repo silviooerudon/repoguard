@@ -1,5 +1,42 @@
 import { SECRET_PATTERNS, type SecretPattern } from "./secret-patterns"
 
+export class GitHubRateLimitError extends Error {
+  readonly retryAfterSeconds: number
+  constructor(retryAfterSeconds: number) {
+    super(`GitHub API rate limit exceeded. Retry in ${retryAfterSeconds}s.`)
+    this.name = "GitHubRateLimitError"
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
+/**
+ * Returns retry-after seconds if the response indicates GitHub rate limiting,
+ * otherwise null. Handles primary rate limit (403 + x-ratelimit-remaining: 0)
+ * and secondary/abuse rate limit (429 with Retry-After header).
+ */
+export function parseGitHubRateLimit(response: Response): number | null {
+  if (response.status !== 403 && response.status !== 429) return null
+
+  const remaining = response.headers.get("x-ratelimit-remaining")
+  const reset = response.headers.get("x-ratelimit-reset")
+  const retryAfter = response.headers.get("retry-after")
+
+  if (remaining === "0" && reset) {
+    const resetEpoch = Number.parseInt(reset, 10)
+    if (Number.isFinite(resetEpoch)) {
+      return Math.max(1, resetEpoch - Math.floor(Date.now() / 1000))
+    }
+  }
+
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10)
+    if (Number.isFinite(seconds)) return Math.max(1, seconds)
+  }
+
+  // 403 without the rate-limit signature is a permission error, not a rate limit
+  return null
+}
+
 export type SecretFinding = {
   patternId: string
   patternName: string
@@ -145,6 +182,10 @@ async function fetchRepoTree(
   })
 
   if (!response.ok) {
+    const retryAfter = parseGitHubRateLimit(response)
+    if (retryAfter !== null) {
+      throw new GitHubRateLimitError(retryAfter)
+    }
     throw new Error(
       `Failed to fetch repo tree: ${response.status} ${response.statusText}`
     )

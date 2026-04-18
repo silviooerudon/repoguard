@@ -21,9 +21,10 @@ export default function PublicScanPage({ params, searchParams }: PageProps) {
   const { owner, repo } = use(params)
   const { branch } = use(searchParams)
 
-  const [status, setStatus] = useState<"running" | "done" | "error">("running")
+  const [status, setStatus] = useState<"running" | "done" | "error" | "rate-limited">("running")
   const [result, setResult] = useState<ScanResultWithDeps | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -36,6 +37,17 @@ export default function PublicScanPage({ params, searchParams }: PageProps) {
           body: JSON.stringify({ defaultBranch: branch ?? "main" }),
           signal: controller.signal,
         })
+
+        if (response.status === 429) {
+          const body = await response.json().catch(() => ({}))
+          const retryAfter =
+            typeof body?.retryAfterSeconds === "number"
+              ? body.retryAfterSeconds
+              : Number.parseInt(response.headers.get("Retry-After") ?? "", 10)
+          setRetryAfterSeconds(Number.isFinite(retryAfter) ? retryAfter : null)
+          setStatus("rate-limited")
+          return
+        }
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}))
@@ -109,6 +121,27 @@ export default function PublicScanPage({ params, searchParams }: PageProps) {
           </div>
         )}
 
+        {/* Rate-limited state */}
+        {status === "rate-limited" && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6">
+            <p className="text-amber-300 font-semibold mb-1">⏳ Anonymous scans rate-limited</p>
+            <p className="text-amber-200/80 text-sm">
+              Public scans share a pool of 60 GitHub requests per hour.
+              {retryAfterSeconds !== null && (
+                <> Try again in <span className="font-mono">{formatRetryAfter(retryAfterSeconds)}</span>.</>
+              )}
+            </p>
+            <div className="mt-4">
+              <Link
+                href="/signin"
+                className="inline-block px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition text-white text-sm font-medium"
+              >
+                Sign in for unlimited scans
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Results */}
         {status === "done" && result && (
           <>
@@ -119,6 +152,17 @@ export default function PublicScanPage({ params, searchParams }: PageProps) {
       </div>
     </main>
   )
+}
+
+function formatRetryAfter(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.ceil(seconds / 60)
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`
+  const hours = Math.floor(minutes / 60)
+  const remaining = minutes % 60
+  return remaining === 0
+    ? `${hours} hour${hours === 1 ? "" : "s"}`
+    : `${hours}h ${remaining}m`
 }
 
 function SignInCTA() {

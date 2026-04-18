@@ -1,4 +1,4 @@
-import { scanRepo } from "@/lib/scan"
+import { scanRepo, GitHubRateLimitError } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { NextResponse } from "next/server"
 
@@ -41,6 +41,18 @@ export async function POST(
 
     return NextResponse.json(fullResult)
   } catch (error) {
+    if (error instanceof GitHubRateLimitError) {
+      return NextResponse.json(
+        {
+          error: "GitHub API rate limit exceeded for anonymous scans.",
+          retryAfterSeconds: error.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        }
+      )
+    }
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { error: `Scan failed: ${message}` },

@@ -230,7 +230,7 @@ export default async function Home() {
               },
               {
                 q: "Can I scan private repositories?",
-                a: "Yes. GitHub OAuth lets you grant access to private repos on a per-account basis.",
+                a: "Not yet. RepoGuard currently requests the public_repo OAuth scope only, so it can't read private code. Private repo support is on the roadmap.",
               },
               {
                 q: "How is this different from GitHub secret scanning?",

@@ -1,4 +1,5 @@
 import type { DependencyFinding } from "./types";
+import { GitHubRateLimitError, parseGitHubRateLimit } from "./scan";
 
 export async function scanDependencies(
   owner: string,
@@ -19,7 +20,13 @@ export async function scanDependencies(
   );
 
   if (pkgRes.status === 404) return []; // não é projeto Node
-  if (!pkgRes.ok) throw new Error(`GitHub API error: ${pkgRes.status}`);
+  if (!pkgRes.ok) {
+    const retryAfter = parseGitHubRateLimit(pkgRes);
+    if (retryAfter !== null) {
+      throw new GitHubRateLimitError(retryAfter);
+    }
+    throw new Error(`GitHub API error: ${pkgRes.status}`);
+  }
 
   const pkgJson = await pkgRes.json();
 
