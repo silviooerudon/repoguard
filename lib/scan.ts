@@ -9,6 +9,17 @@ export class GitHubRateLimitError extends Error {
   }
 }
 
+export class GitHubRepoNotFoundError extends Error {
+  readonly owner: string
+  readonly repo: string
+  constructor(owner: string, repo: string) {
+    super(`Repository ${owner}/${repo} not found or inaccessible.`)
+    this.name = "GitHubRepoNotFoundError"
+    this.owner = owner
+    this.repo = repo
+  }
+}
+
 /**
  * Returns retry-after seconds if the response indicates GitHub rate limiting,
  * otherwise null. Handles primary rate limit (403 + x-ratelimit-remaining: 0)
@@ -119,22 +130,26 @@ export async function scanRepo(
   accessToken: string | null,
   owner: string,
   repo: string,
-  defaultBranch: string = "main"
+  defaultBranch?: string
 ): Promise<ScanResult> {
   const startedAt = Date.now()
   const repoFullName = `${owner}/${repo}`
 
-  // 1. Get the full file tree
-  const tree = await fetchRepoTree(accessToken, owner, repo, defaultBranch)
+  // 1. Resolve branch (use explicit if given, else query repo metadata)
+  const branch =
+    defaultBranch ?? (await fetchRepoMetadata(accessToken, owner, repo)).default_branch
 
-  // 2. Filter to scannable files
+  // 2. Get the full file tree
+  const tree = await fetchRepoTree(accessToken, owner, repo, branch)
+
+  // 3. Filter to scannable files
   const allBlobs = tree.tree.filter((item) => item.type === "blob")
   const scannable = allBlobs.filter((item) => isScannable(item))
 
   const filesToScan = scannable.slice(0, MAX_FILES_TO_SCAN)
   const filesSkipped = allBlobs.length - filesToScan.length
 
-  // 3. Scan files in parallel batches
+  // 4. Scan files in parallel batches
   const findings: SecretFinding[] = []
   let filesScanned = 0
   let timeLimitHit = false
@@ -166,6 +181,29 @@ export async function scanRepo(
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
+}
+
+async function fetchRepoMetadata(
+  accessToken: string | null,
+  owner: string,
+  repo: string
+): Promise<{ default_branch: string }> {
+  const url = `https://api.github.com/repos/${owner}/${repo}`
+  const response = await fetch(url, {
+    headers: buildGitHubHeaders(accessToken),
+    cache: "no-store",
+  })
+
+  if (response.status === 404) {
+    throw new GitHubRepoNotFoundError(owner, repo)
+  }
+  if (!response.ok) {
+    const retryAfter = parseGitHubRateLimit(response)
+    if (retryAfter !== null) throw new GitHubRateLimitError(retryAfter)
+    throw new Error(`Failed to fetch repo metadata: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json()
 }
 
 async function fetchRepoTree(

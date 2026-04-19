@@ -34,7 +34,7 @@ export default function PublicScanPage({ params, searchParams }: PageProps) {
         const response = await fetch(`/api/scan-public/${owner}/${repo}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ defaultBranch: branch ?? "main" }),
+          body: JSON.stringify(branch ? { defaultBranch: branch } : {}),
           signal: controller.signal,
         })
 

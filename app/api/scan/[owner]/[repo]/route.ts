@@ -1,5 +1,5 @@
 import { auth } from "@/auth"
-import { scanRepo } from "@/lib/scan"
+import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { supabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
@@ -36,21 +36,21 @@ export async function POST(
   // 2. Extract route params
   const { owner, repo } = await params
 
-  // 3. Optional: read default branch from body (sent by the dashboard)
-  let defaultBranch = "main"
+  // 3. Optional: read explicit branch from body (otherwise scanRepo auto-detects)
+  let explicitBranch: string | undefined
   try {
     const body = await request.json()
     if (typeof body?.defaultBranch === "string" && body.defaultBranch.length > 0) {
-      defaultBranch = body.defaultBranch
+      explicitBranch = body.defaultBranch
     }
   } catch {
-    // No body or invalid JSON — fall back to "main"
+    // No body or invalid JSON — leave undefined so scanRepo auto-detects
   }
 
   // 4. Run both scans in parallel
   try {
     const [secretsResult, dependencies] = await Promise.all([
-      scanRepo(accessToken, owner, repo, defaultBranch),
+      scanRepo(accessToken, owner, repo, explicitBranch),
       scanDependencies(owner, repo, accessToken),
     ])
 
@@ -79,6 +79,24 @@ export async function POST(
 
     return NextResponse.json(fullResult)
   } catch (error) {
+    if (error instanceof GitHubRateLimitError) {
+      return NextResponse.json(
+        {
+          error: "GitHub API rate limit exceeded.",
+          retryAfterSeconds: error.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        }
+      )
+    }
+    if (error instanceof GitHubRepoNotFoundError) {
+      return NextResponse.json(
+        { error: `Repository ${error.owner}/${error.repo} not found or inaccessible.` },
+        { status: 404 }
+      )
+    }
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { error: `Scan failed: ${message}` },
