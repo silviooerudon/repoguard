@@ -56,6 +56,7 @@ export type SecretFinding = {
   filePath: string
   lineNumber: number
   lineContent: string // masked preview
+  likelyTestFixture: boolean // true if the file path looks like tests/fixtures/mocks/examples
 }
 
 export type ScanResult = {
@@ -83,6 +84,18 @@ const SCANNABLE_EXTENSIONS = new Set([
   "tf", "tfvars", // Terraform
   "bicep", // Azure
 ])
+
+// Heuristics for test/fixture files — findings here are almost always dummy values
+const TEST_PATH_PATTERNS: RegExp[] = [
+  /(^|\/)(tests?|__tests?__|specs?|fixtures?|mocks?|examples?|samples?|testdata|stubs?|cypress|e2e|demos?)\//i,
+  /\.(test|spec)\.[a-z0-9]+$/i, // foo.test.ts, foo.spec.js
+  /_test\.[a-z0-9]+$/i, // Go: foo_test.go
+  /_spec\.[a-z0-9]+$/i, // Ruby-ish: foo_spec.rb
+]
+
+function isTestLikePath(path: string): boolean {
+  return TEST_PATH_PATTERNS.some((pattern) => pattern.test(path))
+}
 
 // Paths to always skip (vendored code, build output, etc.)
 const SKIP_PATH_PATTERNS = [
@@ -308,6 +321,7 @@ function looksBinary(content: string): boolean {
 function matchPatterns(content: string, filePath: string): SecretFinding[] {
   const findings: SecretFinding[] = []
   const lines = content.split("\n")
+  const likelyTestFixture = isTestLikePath(filePath)
 
   for (const pattern of SECRET_PATTERNS) {
     // Reset regex state for global regexes
@@ -328,6 +342,7 @@ function matchPatterns(content: string, filePath: string): SecretFinding[] {
         filePath,
         lineNumber,
         lineContent: maskLine(lineContent, match[0]),
+        likelyTestFixture,
       })
 
       // Prevent infinite loops on zero-width matches

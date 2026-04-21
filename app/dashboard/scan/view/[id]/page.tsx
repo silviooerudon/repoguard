@@ -93,9 +93,15 @@ function SavedScanView({ scan }: { scan: SavedScan }) {
   const findings = scan.result.findings ?? []
   const dependencies = scan.result.dependencies ?? []
 
-  const critical = findings.filter((f) => f.severity === "critical").length
-  const high = findings.filter((f) => f.severity === "high").length
-  const medium = findings.filter((f) => f.severity === "medium").length
+  const sourceFindings = findings.filter((f) => !f.likelyTestFixture)
+  const testFixtureCount = findings.length - sourceFindings.length
+  const sortedFindings = [...findings].sort(
+    (a, b) => Number(a.likelyTestFixture ?? false) - Number(b.likelyTestFixture ?? false)
+  )
+
+  const critical = sourceFindings.filter((f) => f.severity === "critical").length
+  const high = sourceFindings.filter((f) => f.severity === "high").length
+  const medium = sourceFindings.filter((f) => f.severity === "medium").length
 
   return (
     <div className="space-y-6">
@@ -107,6 +113,7 @@ function SavedScanView({ scan }: { scan: SavedScan }) {
         </h1>
         <p className="text-gray-400 text-sm">
           Scanned on {dateStr} • {scan.files_scanned} files • {(scan.duration_ms / 1000).toFixed(2)}s
+          {testFixtureCount > 0 && ` • ${testFixtureCount} match${testFixtureCount === 1 ? "" : "es"} in test files (shown below, not counted above)`}
         </p>
       </div>
 
@@ -130,7 +137,7 @@ function SavedScanView({ scan }: { scan: SavedScan }) {
           <h2 className="text-xl font-semibold">
             {findings.length} {findings.length === 1 ? "secret" : "secrets"} found
           </h2>
-          {findings.map((finding, i) => (
+          {sortedFindings.map((finding, i) => (
             <FindingCard key={i} finding={finding} />
           ))}
         </div>
@@ -171,11 +178,25 @@ function FindingCard({ finding }: { finding: SecretFinding }) {
     medium: { label: "Medium", badge: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" },
   }[finding.severity]
 
+  const isTest = finding.likelyTestFixture ?? false
+
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div
+      className={`bg-gray-900 border border-gray-800 rounded-xl p-5 ${
+        isTest ? "opacity-60" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 flex-wrap mb-1">
         <h3 className="font-semibold">{finding.patternName}</h3>
         <span className={`text-xs px-2 py-0.5 rounded-full border ${config.badge}`}>{config.label}</span>
+        {isTest && (
+          <span
+            className="text-xs px-2 py-0.5 rounded-full border bg-gray-500/10 border-gray-500/30 text-gray-400"
+            title="Found in a test/fixture/mock/example path — likely a dummy value"
+          >
+            Test fixture
+          </span>
+        )}
       </div>
       <p className="text-sm text-gray-400 mb-3">{finding.description}</p>
       <div className="font-mono text-xs bg-black/40 border border-gray-800 rounded-lg p-3 overflow-x-auto">

@@ -185,9 +185,15 @@ function SignInCTA() {
 function ScanResultView({ result }: { result: ScanResultWithDeps }) {
   const { findings, filesScanned, filesSkipped, durationMs, truncated, dependencies } = result
 
-  const critical = findings.filter((f) => f.severity === "critical").length
-  const high = findings.filter((f) => f.severity === "high").length
-  const medium = findings.filter((f) => f.severity === "medium").length
+  const sourceFindings = findings.filter((f) => !f.likelyTestFixture)
+  const testFixtureCount = findings.length - sourceFindings.length
+  const sortedFindings = [...findings].sort(
+    (a, b) => Number(a.likelyTestFixture ?? false) - Number(b.likelyTestFixture ?? false)
+  )
+
+  const critical = sourceFindings.filter((f) => f.severity === "critical").length
+  const high = sourceFindings.filter((f) => f.severity === "high").length
+  const medium = sourceFindings.filter((f) => f.severity === "medium").length
 
   return (
     <div className="space-y-6">
@@ -218,6 +224,7 @@ function ScanResultView({ result }: { result: ScanResultWithDeps }) {
       <p className="text-xs text-gray-500">
         Scan took {(durationMs / 1000).toFixed(2)}s • {filesSkipped} files skipped
         {truncated && " • results truncated (repo too large)"}
+        {testFixtureCount > 0 && ` • ${testFixtureCount} match${testFixtureCount === 1 ? "" : "es"} in test files (shown below, not counted above)`}
       </p>
 
       {/* All clear */}
@@ -241,7 +248,7 @@ function ScanResultView({ result }: { result: ScanResultWithDeps }) {
             {findings.length} potential{" "}
             {findings.length === 1 ? "secret" : "secrets"} found
           </h2>
-          {findings.map((finding, i) => (
+          {sortedFindings.map((finding, i) => (
             <FindingCard key={i} finding={finding} />
           ))}
         </div>
@@ -376,9 +383,14 @@ function FindingCard({ finding }: { finding: SecretFinding }) {
   }
 
   const config = severityConfig[finding.severity]
+  const isTest = finding.likelyTestFixture ?? false
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div
+      className={`bg-gray-900 border border-gray-800 rounded-xl p-5 ${
+        isTest ? "opacity-60" : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -388,6 +400,14 @@ function FindingCard({ finding }: { finding: SecretFinding }) {
             >
               {config.label}
             </span>
+            {isTest && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full border bg-gray-500/10 border-gray-500/30 text-gray-400"
+                title="Found in a test/fixture/mock/example path — likely a dummy value"
+              >
+                Test fixture
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-400">{finding.description}</p>
         </div>
