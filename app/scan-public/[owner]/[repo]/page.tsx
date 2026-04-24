@@ -380,6 +380,10 @@ function FindingCard({ finding }: { finding: SecretFinding }) {
       label: "Medium",
       badge: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400",
     },
+    low: {
+      label: "Low",
+      badge: "bg-gray-500/10 border-gray-500/30 text-gray-400",
+    },
   }
 
   const config = severityConfig[finding.severity]

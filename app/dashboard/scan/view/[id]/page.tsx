@@ -176,6 +176,7 @@ function FindingCard({ finding }: { finding: SecretFinding }) {
     critical: { label: "Critical", badge: "bg-red-500/10 border-red-500/20 text-red-400" },
     high: { label: "High", badge: "bg-orange-500/10 border-orange-500/20 text-orange-400" },
     medium: { label: "Medium", badge: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" },
+    low: { label: "Low", badge: "bg-gray-500/10 border-gray-500/30 text-gray-400" },
   }[finding.severity]
 
   const isTest = finding.likelyTestFixture ?? false

@@ -1,4 +1,13 @@
-import { SECRET_PATTERNS, type SecretPattern } from "./secret-patterns"
+import { SECRET_PATTERNS } from "./secret-patterns"
+import { findSensitiveFiles } from "./sensitive-files"
+import { findEntropySecrets } from "./entropy"
+import type {
+  SecretFinding,
+  SensitiveFileFinding,
+  CodeFinding,
+  IaCFinding,
+  DependencyFinding,
+} from "./types"
 
 export class GitHubRateLimitError extends Error {
   readonly retryAfterSeconds: number
@@ -48,16 +57,7 @@ export function parseGitHubRateLimit(response: Response): number | null {
   return null
 }
 
-export type SecretFinding = {
-  patternId: string
-  patternName: string
-  severity: SecretPattern["severity"]
-  description: string
-  filePath: string
-  lineNumber: number
-  lineContent: string // masked preview
-  likelyTestFixture: boolean // true if the file path looks like tests/fixtures/mocks/examples
-}
+export type { SecretFinding } from "./types"
 
 export type ScanResult = {
   repoFullName: string
@@ -67,6 +67,14 @@ export type ScanResult = {
   findings: SecretFinding[]
   durationMs: number
   truncated: boolean // true if we hit file count or time limits
+  // Optional extended findings. Absent on legacy/persisted scans — UI treats
+  // undefined as an empty list.
+  sensitiveFiles?: SensitiveFileFinding[]
+  historyFindings?: SecretFinding[]
+  codeFindings?: CodeFinding[]
+  iacFindings?: IaCFinding[]
+  dependencies?: DependencyFinding[]
+  pythonDependencies?: DependencyFinding[]
 }
 
 // File extensions we want to scan (text-based, likely to contain secrets)
@@ -162,7 +170,10 @@ export async function scanRepo(
   const filesToScan = scannable.slice(0, MAX_FILES_TO_SCAN)
   const filesSkipped = allBlobs.length - filesToScan.length
 
-  // 4. Scan files in parallel batches
+  // 4. Flag sensitive files by name (no blob fetch needed)
+  const sensitiveFiles = findSensitiveFiles(allBlobs.map((b) => b.path))
+
+  // 5. Scan files in parallel batches
   const findings: SecretFinding[] = []
   let filesScanned = 0
   let timeLimitHit = false
@@ -191,6 +202,7 @@ export async function scanRepo(
     filesScanned,
     filesSkipped,
     findings,
+    sensitiveFiles,
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
@@ -299,7 +311,10 @@ async function scanFile(
     // Skip files that look binary (lots of non-printable chars)
     if (looksBinary(content)) return []
 
-    return matchPatterns(content, file.path)
+    const likelyTestFixture = isTestLikePath(file.path)
+    const regexFindings = matchPatterns(content, file.path, likelyTestFixture)
+    const entropyFindings = findEntropySecrets(content, file.path, likelyTestFixture)
+    return [...regexFindings, ...entropyFindings]
   } catch {
     return []
   }
@@ -318,10 +333,13 @@ function looksBinary(content: string): boolean {
   return nonPrintable / sample.length > 0.1
 }
 
-function matchPatterns(content: string, filePath: string): SecretFinding[] {
+function matchPatterns(
+  content: string,
+  filePath: string,
+  likelyTestFixture: boolean,
+): SecretFinding[] {
   const findings: SecretFinding[] = []
   const lines = content.split("\n")
-  const likelyTestFixture = isTestLikePath(filePath)
 
   for (const pattern of SECRET_PATTERNS) {
     // Reset regex state for global regexes
