@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
+import { scanPythonDependencies } from "@/lib/python-deps"
 import { supabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
@@ -15,13 +16,9 @@ export async function POST(
   request: Request,
   { params }: RouteParams
 ) {
-  // 1. Check authentication
   const session = await auth()
   if (!session) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   // @ts-expect-error - accessToken custom field
@@ -29,14 +26,12 @@ export async function POST(
   if (!accessToken) {
     return NextResponse.json(
       { error: "No access token available. Please sign in again." },
-      { status: 401 }
+      { status: 401 },
     )
   }
 
-  // 2. Extract route params
   const { owner, repo } = await params
 
-  // 3. Optional: read explicit branch from body (otherwise scanRepo auto-detects)
   let explicitBranch: string | undefined
   try {
     const body = await request.json()
@@ -44,22 +39,26 @@ export async function POST(
       explicitBranch = body.defaultBranch
     }
   } catch {
-    // No body or invalid JSON — leave undefined so scanRepo auto-detects
+    // no body — scanRepo auto-detects
   }
 
-  // 4. Run both scans in parallel
   try {
-    const [secretsResult, dependencies] = await Promise.all([
+    const [secretsResult, npmResult, pythonDeps] = await Promise.all([
       scanRepo(accessToken, owner, repo, explicitBranch),
       scanDependencies(owner, repo, accessToken),
+      scanPythonDependencies(owner, repo, accessToken),
     ])
 
     const fullResult = {
       ...secretsResult,
-      dependencies,
+      dependencies: npmResult.vulns,
+      pythonDependencies: pythonDeps,
+      iacFindings: [
+        ...(secretsResult.iacFindings ?? []),
+        ...npmResult.lifecycleIssues,
+      ],
     }
 
-    // 5. Persist scan to Supabase (non-blocking for user response)
     const userId = session.user?.name ?? session.user?.email ?? "unknown"
     const { error: dbError } = await supabase.from("scans").insert({
       user_id: userId,
@@ -69,12 +68,11 @@ export async function POST(
       duration_ms: secretsResult.durationMs,
       files_scanned: secretsResult.filesScanned,
       secrets_count: secretsResult.findings.length,
-      deps_count: dependencies.length,
+      deps_count: npmResult.vulns.length + pythonDeps.length,
     })
 
     if (dbError) {
       console.error("[scan] Failed to persist scan:", dbError.message)
-      // Não falha a resposta pro usuário — scan funcionou, só a persistência falhou
     }
 
     return NextResponse.json(fullResult)
@@ -88,27 +86,23 @@ export async function POST(
         {
           status: 429,
           headers: { "Retry-After": String(error.retryAfterSeconds) },
-        }
+        },
       )
     }
     if (error instanceof GitHubRepoNotFoundError) {
       return NextResponse.json(
         { error: `Repository ${error.owner}/${error.repo} not found or inaccessible.` },
-        { status: 404 }
+        { status: 404 },
       )
     }
     const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.json(
-      { error: `Scan failed: ${message}` },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: `Scan failed: ${message}` }, { status: 500 })
   }
 }
 
-// Also allow GET for convenience during development / manual testing
 export async function GET(
   request: Request,
-  routeCtx: RouteParams
+  routeCtx: RouteParams,
 ) {
   return POST(request, routeCtx)
 }

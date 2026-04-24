@@ -70,7 +70,12 @@ export type SensitiveFileFinding = {
   remediation: string
 }
 
-export type IaCCategory = "dockerfile" | "github-actions" | "terraform"
+export type IaCCategory =
+  | "dockerfile"
+  | "github-actions"
+  | "terraform"
+  | "npm-scripts"
+  | "supply-chain"
 
 export type IaCFinding = {
   ruleId: string
