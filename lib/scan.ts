@@ -1,4 +1,21 @@
-import { SECRET_PATTERNS, type SecretPattern } from "./secret-patterns"
+import { SECRET_PATTERNS } from "./secret-patterns"
+import { findSensitiveFiles } from "./sensitive-files"
+import { findEntropySecrets } from "./entropy"
+import { findCodeVulns } from "./code-vulns"
+import { scanHistory } from "./history"
+import {
+  isActionsWorkflowPath,
+  isDockerfilePath,
+  scanDockerfile,
+  scanGithubActions,
+} from "./iac"
+import type {
+  SecretFinding,
+  SensitiveFileFinding,
+  CodeFinding,
+  IaCFinding,
+  DependencyFinding,
+} from "./types"
 
 export class GitHubRateLimitError extends Error {
   readonly retryAfterSeconds: number
@@ -48,16 +65,7 @@ export function parseGitHubRateLimit(response: Response): number | null {
   return null
 }
 
-export type SecretFinding = {
-  patternId: string
-  patternName: string
-  severity: SecretPattern["severity"]
-  description: string
-  filePath: string
-  lineNumber: number
-  lineContent: string // masked preview
-  likelyTestFixture: boolean // true if the file path looks like tests/fixtures/mocks/examples
-}
+export type { SecretFinding } from "./types"
 
 export type ScanResult = {
   repoFullName: string
@@ -67,6 +75,14 @@ export type ScanResult = {
   findings: SecretFinding[]
   durationMs: number
   truncated: boolean // true if we hit file count or time limits
+  // Optional extended findings. Absent on legacy/persisted scans — UI treats
+  // undefined as an empty list.
+  sensitiveFiles?: SensitiveFileFinding[]
+  historyFindings?: SecretFinding[]
+  codeFindings?: CodeFinding[]
+  iacFindings?: IaCFinding[]
+  dependencies?: DependencyFinding[]
+  pythonDependencies?: DependencyFinding[]
 }
 
 // File extensions we want to scan (text-based, likely to contain secrets)
@@ -162,8 +178,13 @@ export async function scanRepo(
   const filesToScan = scannable.slice(0, MAX_FILES_TO_SCAN)
   const filesSkipped = allBlobs.length - filesToScan.length
 
-  // 4. Scan files in parallel batches
+  // 4. Flag sensitive files by name (no blob fetch needed)
+  const sensitiveFiles = findSensitiveFiles(allBlobs.map((b) => b.path))
+
+  // 5. Scan files in parallel batches
   const findings: SecretFinding[] = []
+  const codeFindings: CodeFinding[] = []
+  const iacFindings: IaCFinding[] = []
   let filesScanned = 0
   let timeLimitHit = false
 
@@ -179,10 +200,25 @@ export async function scanRepo(
       batch.map((file) => scanFile(accessToken, owner, repo, file))
     )
 
-    for (const fileFindings of batchResults) {
-      findings.push(...fileFindings)
+    for (const { secrets, code, iac } of batchResults) {
+      findings.push(...secrets)
+      codeFindings.push(...code)
+      iacFindings.push(...iac)
     }
     filesScanned += batch.length
+  }
+
+  // 6. Scan recent commit history (best-effort; soft-fails on errors)
+  let historyFindings: SecretFinding[] = []
+  try {
+    historyFindings = await scanHistory(accessToken, owner, repo, branch, findings)
+  } catch (err) {
+    if (err instanceof GitHubRateLimitError) {
+      // Don't fail the whole scan just because history hit the rate limit.
+      historyFindings = []
+    } else {
+      historyFindings = []
+    }
   }
 
   return {
@@ -191,6 +227,10 @@ export async function scanRepo(
     filesScanned,
     filesSkipped,
     findings,
+    sensitiveFiles,
+    historyFindings,
+    codeFindings,
+    iacFindings,
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
@@ -276,12 +316,18 @@ function isScannable(item: GitHubTreeItem): boolean {
   return SCANNABLE_EXTENSIONS.has(ext) || fileName.startsWith(".env")
 }
 
+type FileScanResult = {
+  secrets: SecretFinding[]
+  code: CodeFinding[]
+  iac: IaCFinding[]
+}
+
 async function scanFile(
   accessToken: string | null,
   owner: string,
   repo: string,
   file: GitHubTreeItem
-): Promise<SecretFinding[]> {
+): Promise<FileScanResult> {
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${file.sha}`
     const response = await fetch(url, {
@@ -289,19 +335,35 @@ async function scanFile(
       cache: "no-store",
     })
 
-    if (!response.ok) return []
+    if (!response.ok) return { secrets: [], code: [], iac: [] }
 
     const data = (await response.json()) as { content: string; encoding: string }
-    if (data.encoding !== "base64") return []
+    if (data.encoding !== "base64") return { secrets: [], code: [], iac: [] }
 
     const content = Buffer.from(data.content, "base64").toString("utf-8")
 
     // Skip files that look binary (lots of non-printable chars)
-    if (looksBinary(content)) return []
+    if (looksBinary(content)) return { secrets: [], code: [], iac: [] }
 
-    return matchPatterns(content, file.path)
+    const likelyTestFixture = isTestLikePath(file.path)
+    const regexFindings = matchPatterns(content, file.path, likelyTestFixture)
+    const entropyFindings = findEntropySecrets(content, file.path, likelyTestFixture)
+    const codeFindings = findCodeVulns(content, file.path, likelyTestFixture)
+
+    const iac: IaCFinding[] = []
+    if (isDockerfilePath(file.path)) {
+      iac.push(...scanDockerfile(content, file.path))
+    } else if (isActionsWorkflowPath(file.path)) {
+      iac.push(...scanGithubActions(content, file.path))
+    }
+
+    return {
+      secrets: [...regexFindings, ...entropyFindings],
+      code: codeFindings,
+      iac,
+    }
   } catch {
-    return []
+    return { secrets: [], code: [], iac: [] }
   }
 }
 
@@ -318,10 +380,13 @@ function looksBinary(content: string): boolean {
   return nonPrintable / sample.length > 0.1
 }
 
-function matchPatterns(content: string, filePath: string): SecretFinding[] {
+function matchPatterns(
+  content: string,
+  filePath: string,
+  likelyTestFixture: boolean,
+): SecretFinding[] {
   const findings: SecretFinding[] = []
   const lines = content.split("\n")
-  const likelyTestFixture = isTestLikePath(filePath)
 
   for (const pattern of SECRET_PATTERNS) {
     // Reset regex state for global regexes
