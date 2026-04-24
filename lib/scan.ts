@@ -3,6 +3,12 @@ import { findSensitiveFiles } from "./sensitive-files"
 import { findEntropySecrets } from "./entropy"
 import { findCodeVulns } from "./code-vulns"
 import { scanHistory } from "./history"
+import {
+  isActionsWorkflowPath,
+  isDockerfilePath,
+  scanDockerfile,
+  scanGithubActions,
+} from "./iac"
 import type {
   SecretFinding,
   SensitiveFileFinding,
@@ -178,6 +184,7 @@ export async function scanRepo(
   // 5. Scan files in parallel batches
   const findings: SecretFinding[] = []
   const codeFindings: CodeFinding[] = []
+  const iacFindings: IaCFinding[] = []
   let filesScanned = 0
   let timeLimitHit = false
 
@@ -193,9 +200,10 @@ export async function scanRepo(
       batch.map((file) => scanFile(accessToken, owner, repo, file))
     )
 
-    for (const { secrets, code } of batchResults) {
+    for (const { secrets, code, iac } of batchResults) {
       findings.push(...secrets)
       codeFindings.push(...code)
+      iacFindings.push(...iac)
     }
     filesScanned += batch.length
   }
@@ -222,6 +230,7 @@ export async function scanRepo(
     sensitiveFiles,
     historyFindings,
     codeFindings,
+    iacFindings,
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
@@ -310,6 +319,7 @@ function isScannable(item: GitHubTreeItem): boolean {
 type FileScanResult = {
   secrets: SecretFinding[]
   code: CodeFinding[]
+  iac: IaCFinding[]
 }
 
 async function scanFile(
@@ -325,26 +335,35 @@ async function scanFile(
       cache: "no-store",
     })
 
-    if (!response.ok) return { secrets: [], code: [] }
+    if (!response.ok) return { secrets: [], code: [], iac: [] }
 
     const data = (await response.json()) as { content: string; encoding: string }
-    if (data.encoding !== "base64") return { secrets: [], code: [] }
+    if (data.encoding !== "base64") return { secrets: [], code: [], iac: [] }
 
     const content = Buffer.from(data.content, "base64").toString("utf-8")
 
     // Skip files that look binary (lots of non-printable chars)
-    if (looksBinary(content)) return { secrets: [], code: [] }
+    if (looksBinary(content)) return { secrets: [], code: [], iac: [] }
 
     const likelyTestFixture = isTestLikePath(file.path)
     const regexFindings = matchPatterns(content, file.path, likelyTestFixture)
     const entropyFindings = findEntropySecrets(content, file.path, likelyTestFixture)
     const codeFindings = findCodeVulns(content, file.path, likelyTestFixture)
+
+    const iac: IaCFinding[] = []
+    if (isDockerfilePath(file.path)) {
+      iac.push(...scanDockerfile(content, file.path))
+    } else if (isActionsWorkflowPath(file.path)) {
+      iac.push(...scanGithubActions(content, file.path))
+    }
+
     return {
       secrets: [...regexFindings, ...entropyFindings],
       code: codeFindings,
+      iac,
     }
   } catch {
-    return { secrets: [], code: [] }
+    return { secrets: [], code: [], iac: [] }
   }
 }
 
