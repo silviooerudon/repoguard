@@ -1,6 +1,7 @@
 import { SECRET_PATTERNS } from "./secret-patterns"
 import { findSensitiveFiles } from "./sensitive-files"
 import { findEntropySecrets } from "./entropy"
+import { scanHistory } from "./history"
 import type {
   SecretFinding,
   SensitiveFileFinding,
@@ -196,6 +197,19 @@ export async function scanRepo(
     filesScanned += batch.length
   }
 
+  // 6. Scan recent commit history (best-effort; soft-fails on errors)
+  let historyFindings: SecretFinding[] = []
+  try {
+    historyFindings = await scanHistory(accessToken, owner, repo, branch, findings)
+  } catch (err) {
+    if (err instanceof GitHubRateLimitError) {
+      // Don't fail the whole scan just because history hit the rate limit.
+      historyFindings = []
+    } else {
+      historyFindings = []
+    }
+  }
+
   return {
     repoFullName,
     scannedAt: new Date().toISOString(),
@@ -203,6 +217,7 @@ export async function scanRepo(
     filesSkipped,
     findings,
     sensitiveFiles,
+    historyFindings,
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
