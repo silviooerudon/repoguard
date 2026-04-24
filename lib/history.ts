@@ -168,6 +168,7 @@ export async function scanHistory(
   repo: string,
   branch: string,
   treeFindings: SecretFinding[],
+  ignoredPaths: Set<string> = new Set(),
 ): Promise<SecretFinding[]> {
   const startedAt = Date.now()
   const commits = await listCommits(token, owner, repo, branch)
@@ -186,6 +187,7 @@ export async function scanHistory(
       for (const file of detail.files) {
         if (!file.patch) continue
         if (file.patch.length > MAX_PATCH_SIZE) continue
+        if (ignoredPaths.has(file.filename)) continue
         const added = extractAddedLines(file.patch)
         const fileFindings = scanAddedLinesForSecrets(added, file.filename, detail)
         results.push(...fileFindings)
