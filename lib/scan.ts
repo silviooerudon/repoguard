@@ -1,6 +1,7 @@
 import { SECRET_PATTERNS } from "./secret-patterns"
 import { findSensitiveFiles } from "./sensitive-files"
 import { findEntropySecrets } from "./entropy"
+import { findCodeVulns } from "./code-vulns"
 import { scanHistory } from "./history"
 import type {
   SecretFinding,
@@ -176,6 +177,7 @@ export async function scanRepo(
 
   // 5. Scan files in parallel batches
   const findings: SecretFinding[] = []
+  const codeFindings: CodeFinding[] = []
   let filesScanned = 0
   let timeLimitHit = false
 
@@ -191,8 +193,9 @@ export async function scanRepo(
       batch.map((file) => scanFile(accessToken, owner, repo, file))
     )
 
-    for (const fileFindings of batchResults) {
-      findings.push(...fileFindings)
+    for (const { secrets, code } of batchResults) {
+      findings.push(...secrets)
+      codeFindings.push(...code)
     }
     filesScanned += batch.length
   }
@@ -218,6 +221,7 @@ export async function scanRepo(
     findings,
     sensitiveFiles,
     historyFindings,
+    codeFindings,
     durationMs: Date.now() - startedAt,
     truncated: tree.truncated || timeLimitHit || scannable.length > MAX_FILES_TO_SCAN,
   }
@@ -303,12 +307,17 @@ function isScannable(item: GitHubTreeItem): boolean {
   return SCANNABLE_EXTENSIONS.has(ext) || fileName.startsWith(".env")
 }
 
+type FileScanResult = {
+  secrets: SecretFinding[]
+  code: CodeFinding[]
+}
+
 async function scanFile(
   accessToken: string | null,
   owner: string,
   repo: string,
   file: GitHubTreeItem
-): Promise<SecretFinding[]> {
+): Promise<FileScanResult> {
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${file.sha}`
     const response = await fetch(url, {
@@ -316,22 +325,26 @@ async function scanFile(
       cache: "no-store",
     })
 
-    if (!response.ok) return []
+    if (!response.ok) return { secrets: [], code: [] }
 
     const data = (await response.json()) as { content: string; encoding: string }
-    if (data.encoding !== "base64") return []
+    if (data.encoding !== "base64") return { secrets: [], code: [] }
 
     const content = Buffer.from(data.content, "base64").toString("utf-8")
 
     // Skip files that look binary (lots of non-printable chars)
-    if (looksBinary(content)) return []
+    if (looksBinary(content)) return { secrets: [], code: [] }
 
     const likelyTestFixture = isTestLikePath(file.path)
     const regexFindings = matchPatterns(content, file.path, likelyTestFixture)
     const entropyFindings = findEntropySecrets(content, file.path, likelyTestFixture)
-    return [...regexFindings, ...entropyFindings]
+    const codeFindings = findCodeVulns(content, file.path, likelyTestFixture)
+    return {
+      secrets: [...regexFindings, ...entropyFindings],
+      code: codeFindings,
+    }
   } catch {
-    return []
+    return { secrets: [], code: [] }
   }
 }
 
