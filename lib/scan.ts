@@ -185,6 +185,7 @@ export async function scanRepo(
   const findings: SecretFinding[] = []
   const codeFindings: CodeFinding[] = []
   const iacFindings: IaCFinding[] = []
+  const ignoredPaths = new Set<string>()
   let filesScanned = 0
   let timeLimitHit = false
 
@@ -200,18 +201,26 @@ export async function scanRepo(
       batch.map((file) => scanFile(accessToken, owner, repo, file))
     )
 
-    for (const { secrets, code, iac } of batchResults) {
-      findings.push(...secrets)
-      codeFindings.push(...code)
-      iacFindings.push(...iac)
-    }
+    batchResults.forEach((res, j) => {
+      findings.push(...res.secrets)
+      codeFindings.push(...res.code)
+      iacFindings.push(...res.iac)
+      if (res.ignoredByDirective) ignoredPaths.add(batch[j].path)
+    })
     filesScanned += batch.length
   }
 
   // 6. Scan recent commit history (best-effort; soft-fails on errors)
   let historyFindings: SecretFinding[] = []
   try {
-    historyFindings = await scanHistory(accessToken, owner, repo, branch, findings)
+    historyFindings = await scanHistory(
+      accessToken,
+      owner,
+      repo,
+      branch,
+      findings,
+      ignoredPaths,
+    )
   } catch (err) {
     if (err instanceof GitHubRateLimitError) {
       // Don't fail the whole scan just because history hit the rate limit.
@@ -320,6 +329,18 @@ type FileScanResult = {
   secrets: SecretFinding[]
   code: CodeFinding[]
   iac: IaCFinding[]
+  ignoredByDirective: boolean
+}
+
+// Files with this marker in the first 30 lines are skipped. Lets scanner-author
+// projects (and users who document their own patterns) opt out of detection
+// on rule-definition or documentation files that legitimately contain the
+// token formats we look for.
+const IGNORE_DIRECTIVE = /\brepoguard:ignore-file\b/
+
+function hasIgnoreDirective(content: string): boolean {
+  const head = content.split("\n").slice(0, 30).join("\n")
+  return IGNORE_DIRECTIVE.test(head)
 }
 
 async function scanFile(
@@ -335,15 +356,25 @@ async function scanFile(
       cache: "no-store",
     })
 
-    if (!response.ok) return { secrets: [], code: [], iac: [] }
+    if (!response.ok) return { secrets: [], code: [], iac: [], ignoredByDirective: false }
 
     const data = (await response.json()) as { content: string; encoding: string }
-    if (data.encoding !== "base64") return { secrets: [], code: [], iac: [] }
+    if (data.encoding !== "base64") {
+      return { secrets: [], code: [], iac: [], ignoredByDirective: false }
+    }
 
     const content = Buffer.from(data.content, "base64").toString("utf-8")
 
     // Skip files that look binary (lots of non-printable chars)
-    if (looksBinary(content)) return { secrets: [], code: [], iac: [] }
+    if (looksBinary(content)) {
+      return { secrets: [], code: [], iac: [], ignoredByDirective: false }
+    }
+
+    // Honor opt-out directive — used by our own rule files and files that
+    // legitimately document token formats (READMEs describing what we detect).
+    if (hasIgnoreDirective(content)) {
+      return { secrets: [], code: [], iac: [], ignoredByDirective: true }
+    }
 
     const likelyTestFixture = isTestLikePath(file.path)
     const regexFindings = matchPatterns(content, file.path, likelyTestFixture)
@@ -361,9 +392,10 @@ async function scanFile(
       secrets: [...regexFindings, ...entropyFindings],
       code: codeFindings,
       iac,
+      ignoredByDirective: false,
     }
   } catch {
-    return { secrets: [], code: [], iac: [] }
+    return { secrets: [], code: [], iac: [], ignoredByDirective: false }
   }
 }
 

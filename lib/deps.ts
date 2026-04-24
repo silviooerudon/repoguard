@@ -1,3 +1,5 @@
+// repoguard:ignore-file — contains suspicious-script patterns we look for
+// inside package.json lifecycle hooks.
 import type { DependencyFinding, IaCFinding } from "./types"
 import { GitHubRateLimitError, parseGitHubRateLimit } from "./scan"
 

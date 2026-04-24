@@ -1,3 +1,4 @@
+// repoguard:ignore-file — IaC rules cite the misconfigurations they detect.
 import type { IaCFinding, Severity } from "./types"
 
 type DockerRule = {

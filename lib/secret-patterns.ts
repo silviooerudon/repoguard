@@ -1,3 +1,5 @@
+// repoguard:ignore-file — this file defines detection patterns, so it will
+// naturally contain strings that look like the tokens we scan for.
 import type { Severity } from "./types"
 
 export type SecretPattern = {
