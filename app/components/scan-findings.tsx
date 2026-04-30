@@ -6,6 +6,8 @@ import type {
   SensitiveFileFinding,
   Severity,
 } from "@/lib/types"
+import type { PrioritizedFinding } from "@/lib/risk"
+import { FindingCard } from "./finding-card"
 
 type SeverityBadge = { label: string; badge: string }
 
@@ -32,7 +34,7 @@ const SEVERITY_BADGES: Record<Severity | "moderate", SeverityBadge> = {
   },
 }
 
-function SeverityPill({ severity }: { severity: Severity | "moderate" }) {
+export function SeverityPill({ severity }: { severity: Severity | "moderate" }) {
   const cfg = SEVERITY_BADGES[severity] ?? SEVERITY_BADGES.medium
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.badge}`}>
@@ -41,7 +43,7 @@ function SeverityPill({ severity }: { severity: Severity | "moderate" }) {
   )
 }
 
-function BadgePill({
+export function BadgePill({
   label,
   tone = "neutral",
   title,
@@ -392,6 +394,21 @@ export function DependenciesSection({
             </a>
           </div>
         </article>
+      ))}
+    </section>
+  )
+}
+
+export function PrioritizedList({
+  findings,
+}: {
+  findings: PrioritizedFinding[]
+}) {
+  if (findings.length === 0) return <AllClear />
+  return (
+    <section className="space-y-3">
+      {findings.map((f, i) => (
+        <FindingCard key={i} finding={f} />
       ))}
     </section>
   )
