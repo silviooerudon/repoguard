@@ -3,6 +3,7 @@ import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/s
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
 import { supabase } from "@/lib/supabase"
+import { flattenScan, scoreRepo } from "@/lib/risk"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -59,6 +60,8 @@ export async function POST(
       ],
     }
 
+    const assessment = scoreRepo(flattenScan(fullResult))
+
     const userId = session.user?.name ?? session.user?.email ?? "unknown"
     const { error: dbError } = await supabase.from("scans").insert({
       user_id: userId,
@@ -69,13 +72,19 @@ export async function POST(
       files_scanned: secretsResult.filesScanned,
       secrets_count: secretsResult.findings.length,
       deps_count: npmResult.vulns.length + pythonDeps.length,
+      risk_score: assessment.score,
     })
 
     if (dbError) {
       console.error("[scan] Failed to persist scan:", dbError.message)
     }
 
-    return NextResponse.json(fullResult)
+    return NextResponse.json({
+      ...fullResult,
+      riskScore: assessment.score,
+      riskBreakdown: assessment.breakdown,
+      prioritized: assessment.prioritized,
+    })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

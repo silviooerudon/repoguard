@@ -1,6 +1,7 @@
 import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
+import { flattenScan, scoreRepo } from "@/lib/risk"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -43,7 +44,14 @@ export async function POST(
       ],
     }
 
-    return NextResponse.json(fullResult)
+    const assessment = scoreRepo(flattenScan(fullResult))
+
+    return NextResponse.json({
+      ...fullResult,
+      riskScore: assessment.score,
+      riskBreakdown: assessment.breakdown,
+      prioritized: assessment.prioritized,
+    })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
