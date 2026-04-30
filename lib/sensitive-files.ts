@@ -18,9 +18,19 @@ const FILE_RULES: FileRule[] = [
       "Private cryptographic key file (.pem/.key). Should never be committed — used to sign tokens, authenticate to TLS endpoints, or decrypt data.",
     remediation:
       "Remove from repo, rotate the key, and move to a secrets manager (Vault, AWS Secrets Manager, GCP Secret Manager).",
-    matches: (_p, b) =>
-      /\.(pem|key|asc)$/i.test(b) &&
-      !/(public|pub|cert|cer|crt|csr)\.(pem|key)$/i.test(b),
+    matches: (_p, b) => {
+      if (/\.(pem|key)$/i.test(b)) {
+        return !/(public|pub|cert|cer|crt|csr)\.(pem|key)$/i.test(b)
+      }
+      if (/\.asc$/i.test(b)) {
+        const stem = b.replace(/\.asc$/i, "")
+        if (/\.(json|tar|tgz|gz|bz2|xz|zip|sig|txt|md|pdf|deb|rpm|whl|jar|exe|dmg|iso|img|apk|tar\.gz)$/i.test(stem)) {
+          return false
+        }
+        return /private|priv|secret/i.test(stem) || /^id_(rsa|dsa|ecdsa|ed25519)/i.test(stem)
+      }
+      return false
+    },
   },
   {
     kind: "keystore",
