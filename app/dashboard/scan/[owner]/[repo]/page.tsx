@@ -3,11 +3,13 @@
 import { useEffect, useState, use } from "react"
 import type { ScanResult } from "@/lib/scan"
 import type { DependencyFinding } from "@/lib/types"
+import type { PrioritizedFinding, RiskBreakdown } from "@/lib/risk"
 import {
   AllClear,
   CodeFindingsSection,
   DependenciesSection,
   IaCFindingsSection,
+  PrioritizedList,
   SecretsSection,
   SensitiveFilesSection,
   SummaryCard,
@@ -15,10 +17,16 @@ import {
   totalCount,
   type AllFindings,
 } from "@/app/components/scan-findings"
+import { RiskGauge } from "@/app/components/risk-gauge"
+import { RiskBreakdownChart } from "@/app/components/risk-breakdown"
+import { ViewToggleButton } from "@/app/components/view-toggle"
 
 type ScanResultFull = ScanResult & {
   dependencies?: DependencyFinding[]
   pythonDependencies?: DependencyFinding[]
+  riskScore?: number
+  riskBreakdown?: RiskBreakdown
+  prioritized?: PrioritizedFinding[]
 }
 
 type PageProps = {
@@ -108,6 +116,8 @@ export default function ScanPage({ params, searchParams }: PageProps) {
 }
 
 function ScanResultView({ result }: { result: ScanResultFull }) {
+  const [view, setView] = useState<"prioritized" | "by-detector">("prioritized")
+
   const all: AllFindings = {
     secrets: (result.findings ?? []).filter(
       (f) => !f.source || f.source === "tree",
@@ -122,40 +132,47 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
 
   const counts = countBySeverity(all)
   const total = totalCount(all)
+  const hasRisk =
+    typeof result.riskScore === "number" &&
+    !!result.riskBreakdown &&
+    !!result.prioritized
 
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryCard
-          label="Files scanned"
-          value={result.filesScanned.toString()}
-          tone="neutral"
-        />
-        <SummaryCard
-          label="Critical"
-          value={counts.critical.toString()}
-          tone={counts.critical > 0 ? "red" : "neutral"}
-        />
-        <SummaryCard
-          label="High"
-          value={counts.high.toString()}
-          tone={counts.high > 0 ? "orange" : "neutral"}
-        />
-        <SummaryCard
-          label="Medium + Low"
-          value={(counts.medium + counts.low).toString()}
-          tone={counts.medium + counts.low > 0 ? "yellow" : "neutral"}
-        />
-      </div>
+  const summaryRow = (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <SummaryCard
+        label="Files scanned"
+        value={result.filesScanned.toString()}
+        tone="neutral"
+      />
+      <SummaryCard
+        label="Critical"
+        value={counts.critical.toString()}
+        tone={counts.critical > 0 ? "red" : "neutral"}
+      />
+      <SummaryCard
+        label="High"
+        value={counts.high.toString()}
+        tone={counts.high > 0 ? "orange" : "neutral"}
+      />
+      <SummaryCard
+        label="Medium + Low"
+        value={(counts.medium + counts.low).toString()}
+        tone={counts.medium + counts.low > 0 ? "yellow" : "neutral"}
+      />
+    </div>
+  )
 
-      <p className="text-xs text-gray-500">
-        Scan took {(result.durationMs / 1000).toFixed(2)}s •{" "}
-        {result.filesSkipped} files skipped
-        {result.truncated && " • results truncated (repo too large)"}
-      </p>
+  const meta = (
+    <p className="text-xs text-gray-500">
+      Scan took {(result.durationMs / 1000).toFixed(2)}s •{" "}
+      {result.filesSkipped} files skipped
+      {result.truncated && " • results truncated (repo too large)"}
+    </p>
+  )
 
+  const legacySections = (
+    <>
       {total === 0 && <AllClear />}
-
       <SecretsSection findings={all.secrets} sourceLabel="tree" />
       <SensitiveFilesSection findings={all.sensitiveFiles} />
       <CodeFindingsSection findings={all.codeFindings} />
@@ -163,6 +180,62 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
       <DependenciesSection findings={all.pythonDependencies} label="Python" />
       <IaCFindingsSection findings={all.iacFindings} />
       <SecretsSection findings={all.historySecrets} sourceLabel="history" />
+    </>
+  )
+
+  if (!hasRisk) {
+    return (
+      <div className="space-y-6">
+        {summaryRow}
+        {meta}
+        {legacySections}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {summaryRow}
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-stretch">
+        <div className="shrink-0 flex items-center justify-center">
+          <RiskGauge score={result.riskScore!} />
+        </div>
+        <div className="flex-1 w-full flex flex-col justify-center">
+          <h2 className="text-sm uppercase tracking-wider text-gray-500 mb-3">
+            Where the score comes from
+          </h2>
+          <RiskBreakdownChart breakdown={result.riskBreakdown!} />
+          <p className="text-xs text-gray-500 mt-4">
+            {result.prioritized!.length} finding
+            {result.prioritized!.length === 1 ? "" : "s"} ranked by risk.
+          </p>
+        </div>
+      </div>
+
+      {meta}
+
+      <div className="flex items-center gap-2">
+        <ViewToggleButton
+          active={view === "prioritized"}
+          onClick={() => setView("prioritized")}
+        >
+          Sorted by risk
+        </ViewToggleButton>
+        <ViewToggleButton
+          active={view === "by-detector"}
+          onClick={() => setView("by-detector")}
+        >
+          Group by detector
+        </ViewToggleButton>
+      </div>
+
+      {view === "prioritized" ? (
+        <PrioritizedList findings={result.prioritized!} />
+      ) : (
+        legacySections
+      )}
     </div>
   )
 }
+
