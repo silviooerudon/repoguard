@@ -285,6 +285,45 @@ async function fetchRepoTree(
   return response.json()
 }
 
+/**
+ * Best-effort fetch of `.repoguardignore` from the repo root via the GitHub
+ * Contents API. Soft-fails on any error (404, rate limit, decode error) by
+ * returning null — the scan should never fail because the suppressions file
+ * is missing or unreadable. Does NOT count against the MAX_FILES_TO_SCAN limit.
+ */
+export async function fetchSuppressionsFile(
+  accessToken: string | null,
+  owner: string,
+  repo: string,
+  ref?: string,
+): Promise<string | null> {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/.repoguardignore${
+    ref ? `?ref=${encodeURIComponent(ref)}` : ""
+  }`
+  try {
+    const response = await fetch(url, {
+      headers: buildGitHubHeaders(accessToken),
+      cache: "no-store",
+    })
+    if (response.status === 404) return null
+    if (!response.ok) {
+      console.warn(
+        `[suppressions] Unexpected status fetching .repoguardignore: ${response.status} ${response.statusText}`,
+      )
+      return null
+    }
+    const data = (await response.json()) as { content?: string; encoding?: string }
+    if (data.encoding !== "base64" || !data.content) return null
+    return Buffer.from(data.content, "base64").toString("utf-8")
+  } catch (err) {
+    console.warn(
+      "[suppressions] Failed to fetch .repoguardignore:",
+      err instanceof Error ? err.message : String(err),
+    )
+    return null
+  }
+}
+
 function isScannable(item: GitHubTreeItem): boolean {
   const path = item.path
 

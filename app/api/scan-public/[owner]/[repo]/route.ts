@@ -1,7 +1,13 @@
-import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/scan"
+import {
+  scanRepo,
+  GitHubRateLimitError,
+  GitHubRepoNotFoundError,
+  fetchSuppressionsFile,
+} from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
 import { flattenScan, scoreRepo } from "@/lib/risk"
+import { parseSuppressions, applySuppressions } from "@/lib/suppressions"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -44,13 +50,31 @@ export async function POST(
       ],
     }
 
-    const assessment = scoreRepo(flattenScan(fullResult))
+    const flatFindings = flattenScan(fullResult)
+
+    // Best-effort: anonymous scan (no accessToken). Same race window caveat as
+    // the authenticated route — see app/api/scan/[owner]/[repo]/route.ts for
+    // rationale.
+    const suppressionsContent = await fetchSuppressionsFile(
+      null,
+      owner,
+      repo,
+      explicitBranch,
+    )
+    const parsedSuppressions = suppressionsContent
+      ? parseSuppressions(suppressionsContent)
+      : []
+    const suppressionResult = applySuppressions(flatFindings, parsedSuppressions)
+
+    const assessment = scoreRepo(suppressionResult.kept)
 
     return NextResponse.json({
       ...fullResult,
       riskScore: assessment.score,
       riskBreakdown: assessment.breakdown,
       prioritized: assessment.prioritized,
+      suppressed: suppressionResult.suppressed,
+      expiredSuppressionsCount: suppressionResult.expiredSuppressionsCount,
     })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {

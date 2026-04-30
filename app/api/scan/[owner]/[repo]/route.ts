@@ -1,9 +1,15 @@
 import { auth } from "@/auth"
-import { scanRepo, GitHubRateLimitError, GitHubRepoNotFoundError } from "@/lib/scan"
+import {
+  scanRepo,
+  GitHubRateLimitError,
+  GitHubRepoNotFoundError,
+  fetchSuppressionsFile,
+} from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
 import { supabase } from "@/lib/supabase"
 import { flattenScan, scoreRepo } from "@/lib/risk"
+import { parseSuppressions, applySuppressions } from "@/lib/suppressions"
 import { NextResponse } from "next/server"
 
 type RouteParams = {
@@ -60,7 +66,25 @@ export async function POST(
       ],
     }
 
-    const assessment = scoreRepo(flattenScan(fullResult))
+    const flatFindings = flattenScan(fullResult)
+
+    // Best-effort: if explicitBranch is undefined, GitHub Contents API resolves
+    // to default branch independently of scanRepo's resolution. Tiny race window
+    // is acceptable for MVP — worst case is suppressions from a slightly different
+    // commit, which only affects which findings get filtered (no security risk).
+    // Backlog: thread commit SHA through ScanResult to eliminate the race.
+    const suppressionsContent = await fetchSuppressionsFile(
+      accessToken,
+      owner,
+      repo,
+      explicitBranch,
+    )
+    const parsedSuppressions = suppressionsContent
+      ? parseSuppressions(suppressionsContent)
+      : []
+    const suppressionResult = applySuppressions(flatFindings, parsedSuppressions)
+
+    const assessment = scoreRepo(suppressionResult.kept)
 
     const userId = session.user?.name ?? session.user?.email ?? "unknown"
     const { error: dbError } = await supabase.from("scans").insert({
@@ -73,6 +97,7 @@ export async function POST(
       secrets_count: secretsResult.findings.length,
       deps_count: npmResult.vulns.length + pythonDeps.length,
       risk_score: assessment.score,
+      suppressed_count: suppressionResult.suppressed.length,
     })
 
     if (dbError) {
@@ -84,6 +109,8 @@ export async function POST(
       riskScore: assessment.score,
       riskBreakdown: assessment.breakdown,
       prioritized: assessment.prioritized,
+      suppressed: suppressionResult.suppressed,
+      expiredSuppressionsCount: suppressionResult.expiredSuppressionsCount,
     })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {
