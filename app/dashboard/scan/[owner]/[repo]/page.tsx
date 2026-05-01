@@ -20,6 +20,9 @@ import {
 import { RiskGauge } from "@/app/components/risk-gauge"
 import { RiskBreakdownChart } from "@/app/components/risk-breakdown"
 import { ViewToggleButton } from "@/app/components/view-toggle"
+import { ExpiredSuppressionsBanner } from "@/app/components/expired-suppressions-banner"
+import { SuppressedFindingsSection } from "@/app/components/suppressed-findings-section"
+import type { SuppressedFinding } from "@/lib/suppressions"
 
 type ScanResultFull = ScanResult & {
   dependencies?: DependencyFinding[]
@@ -27,6 +30,8 @@ type ScanResultFull = ScanResult & {
   riskScore?: number
   riskBreakdown?: RiskBreakdown
   prioritized?: PrioritizedFinding[]
+  suppressed?: SuppressedFinding[]
+  expiredSuppressionsCount?: number
 }
 
 type PageProps = {
@@ -186,15 +191,18 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
   if (!hasRisk) {
     return (
       <div className="space-y-6">
+        <ExpiredSuppressionsBanner count={result.expiredSuppressionsCount ?? 0} />
         {summaryRow}
         {meta}
         {legacySections}
+        <SuppressedFindingsSection items={result.suppressed ?? []} />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      <ExpiredSuppressionsBanner count={result.expiredSuppressionsCount ?? 0} />
       {summaryRow}
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-stretch">
@@ -235,6 +243,8 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
       ) : (
         legacySections
       )}
+
+      <SuppressedFindingsSection items={result.suppressed ?? []} />
     </div>
   )
 }
