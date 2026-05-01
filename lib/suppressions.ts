@@ -1,4 +1,5 @@
 import { minimatch } from "minimatch";
+import type { AnyFinding } from "@/lib/risk";
 
 export type Suppression = {
   pathGlob: string;
@@ -9,13 +10,13 @@ export type Suppression = {
 };
 
 export type SuppressedFinding = {
-  finding: unknown; // será tipado quando integrarmos
+  finding: AnyFinding;
   suppression: Suppression;
   expired: boolean;
 };
 
 export type SuppressionResult = {
-  kept: unknown[]; // findings que NÃO foram suprimidos
+  kept: AnyFinding[]; // findings que NÃO foram suprimidos
   suppressed: SuppressedFinding[];
   expiredSuppressionsCount: number;
 };
@@ -178,7 +179,7 @@ function isExpired(suppression: Suppression, now: Date): boolean {
 }
 
 export function applySuppressions(
-  findings: any[],
+  findings: AnyFinding[],
   suppressions: Suppression[],
   now: Date = new Date(),
 ): SuppressionResult {
@@ -188,7 +189,7 @@ export function applySuppressions(
     .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
     .map((x) => x.s);
 
-  const kept: any[] = [];
+  const kept: AnyFinding[] = [];
   const suppressed: SuppressedFinding[] = [];
   const expiredSuppressionLines = new Set<number>();
 

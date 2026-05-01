@@ -5,10 +5,9 @@ import {
   findAlternateRuleIds,
   getFindingPath,
 } from "../lib/suppressions";
+import type { AnyFinding } from "../lib/risk";
 
-type Finding = { kind: string; data: any };
-
-const findings: Finding[] = [
+const findings: AnyFinding[] = [
   {
     kind: "secret",
     data: {
@@ -126,7 +125,7 @@ function assert(label: string, ok: boolean): void {
   if (!ok) failures.push(label);
 }
 
-function findingLabel(f: Finding): string {
+function findingLabel(f: AnyFinding): string {
   const primary = findRuleIdForFinding(f);
   return `${f.kind} @ ${getFindingPath(f)} → ${primary}`;
 }
@@ -156,14 +155,14 @@ const result = applySuppressions(findings, suppressions);
 
 console.log("\n=== KEPT ===");
 console.log(`Count: ${result.kept.length}`);
-for (const f of result.kept as Finding[]) {
+for (const f of result.kept) {
   console.log(`  ${findingLabel(f)}`);
 }
 
 console.log("\n=== SUPPRESSED ===");
 console.log(`Count: ${result.suppressed.length}`);
 for (const sf of result.suppressed) {
-  const f = sf.finding as Finding;
+  const f = sf.finding;
   console.log(
     `  ${findingLabel(f)}  ←  L${sf.suppression.sourceLine} [rule=${
       sf.suppression.ruleGlob ?? "(any)"
@@ -181,7 +180,7 @@ for (const sf of result.suppressed) {
   suppressedByPath.set(getFindingPath(sf.finding), sf);
 }
 const keptPaths = new Set(
-  (result.kept as Finding[]).map((f) => getFindingPath(f)),
+  result.kept.map((f) => getFindingPath(f)),
 );
 
 const sf1 = suppressedByPath.get("src/config.ts");
