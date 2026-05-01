@@ -1,9 +1,0 @@
-# Smoke test for suppressions UI
-# Active rule with reason
-scripts/test-suppressions.ts [reason="Synthetic test fixtures"]
-
-# Active rule with ruleGlob
-docs/** [rule=secret/*] [reason="Documentation never has real secrets"]
-
-# Expired rule (date in the past)
-lib/** [rule=secret/aws-*] [expires=2024-01-01] [reason="Migration plan"]
