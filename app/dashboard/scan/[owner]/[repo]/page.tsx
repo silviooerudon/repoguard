@@ -22,7 +22,9 @@ import { RiskBreakdownChart } from "@/app/components/risk-breakdown"
 import { ViewToggleButton } from "@/app/components/view-toggle"
 import { ExpiredSuppressionsBanner } from "@/app/components/expired-suppressions-banner"
 import { SuppressedFindingsSection } from "@/app/components/suppressed-findings-section"
+import { PostureCard } from "@/app/components/posture-card"
 import type { SuppressedFinding } from "@/lib/suppressions"
+import type { PostureResult } from "@/lib/posture"
 
 type ScanResultFull = ScanResult & {
   dependencies?: DependencyFinding[]
@@ -32,6 +34,7 @@ type ScanResultFull = ScanResult & {
   prioritized?: PrioritizedFinding[]
   suppressed?: SuppressedFinding[]
   expiredSuppressionsCount?: number
+  posture?: PostureResult
 }
 
 type PageProps = {
@@ -220,6 +223,8 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
           </p>
         </div>
       </div>
+
+      {result.posture && <PostureCard posture={result.posture} />}
 
       {meta}
 
