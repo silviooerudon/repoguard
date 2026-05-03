@@ -12,9 +12,9 @@ function categoryLabel(id: string): string {
   return id
 }
 
-function barColor(points: number, pointsMax: number): string {
+function barColor(pointsEarned: number, pointsMax: number): string {
   if (pointsMax === 0) return "#374151"
-  const pct = (points / pointsMax) * 100
+  const pct = (pointsEarned / pointsMax) * 100
   if (pct >= 90) return "#22c55e"
   if (pct >= 75) return "#3b82f6"
   if (pct >= 60) return "#eab308"
@@ -41,14 +41,14 @@ export function PostureCard({ posture }: PostureCardProps) {
 
         <div className="space-y-3 mb-5">
           {posture.breakdown.map((cat) => {
-            const pct = cat.pointsMax === 0 ? 0 : (cat.points / cat.pointsMax) * 100
-            const color = barColor(cat.points, cat.pointsMax)
+            const pct = cat.pointsMax === 0 ? 0 : (cat.pointsEarned / cat.pointsMax) * 100
+            const color = barColor(cat.pointsEarned, cat.pointsMax)
             return (
               <div key={cat.id}>
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-gray-300">{categoryLabel(cat.id)}</span>
                   <span className="text-gray-500 font-mono">
-                    {cat.points} / {cat.pointsMax}
+                    {cat.pointsEarned} / {cat.pointsMax}
                   </span>
                 </div>
                 <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -79,7 +79,7 @@ export function PostureCard({ posture }: PostureCardProps) {
                 >
                   <span>- {qw.label}</span>
                   <span className="text-xs text-gray-500 font-mono shrink-0">
-                    +{qw.pointsMax} pts
+                    +{qw.pointsAvailable} pts
                   </span>
                 </li>
               ))}
