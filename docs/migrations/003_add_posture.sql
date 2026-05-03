@@ -1,0 +1,5 @@
+ALTER TABLE scans
+ADD COLUMN IF NOT EXISTS posture_score INTEGER,
+ADD COLUMN IF NOT EXISTS posture_grade TEXT,
+ADD COLUMN IF NOT EXISTS posture_breakdown JSONB,
+ADD COLUMN IF NOT EXISTS posture_quick_wins JSONB;

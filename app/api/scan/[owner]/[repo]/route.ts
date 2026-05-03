@@ -7,6 +7,7 @@ import {
 } from "@/lib/scan"
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
+import { assessPosture } from "@/lib/posture"
 import { supabase } from "@/lib/supabase"
 import { flattenScan, scoreRepo } from "@/lib/risk"
 import { parseSuppressions, applySuppressions } from "@/lib/suppressions"
@@ -50,10 +51,11 @@ export async function POST(
   }
 
   try {
-    const [secretsResult, npmResult, pythonDeps] = await Promise.all([
+    const [secretsResult, npmResult, pythonDeps, postureResult] = await Promise.all([
       scanRepo(accessToken, owner, repo, explicitBranch),
       scanDependencies(owner, repo, accessToken),
       scanPythonDependencies(owner, repo, accessToken),
+      assessPosture(owner, repo, accessToken),
     ])
 
     const fullResult = {
@@ -98,6 +100,10 @@ export async function POST(
       deps_count: npmResult.vulns.length + pythonDeps.length,
       risk_score: assessment.score,
       suppressed_count: suppressionResult.suppressed.length,
+      posture_score: postureResult.score,
+      posture_grade: postureResult.grade,
+      posture_breakdown: postureResult.breakdown,
+      posture_quick_wins: postureResult.quickWins,
     })
 
     if (dbError) {
@@ -111,6 +117,7 @@ export async function POST(
       prioritized: assessment.prioritized,
       suppressed: suppressionResult.suppressed,
       expiredSuppressionsCount: suppressionResult.expiredSuppressionsCount,
+      posture: postureResult,
     })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {
