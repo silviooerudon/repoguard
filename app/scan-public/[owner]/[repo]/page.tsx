@@ -5,6 +5,7 @@ import Link from "next/link"
 import type { ScanResult } from "@/lib/scan"
 import type { DependencyFinding } from "@/lib/types"
 import type { PrioritizedFinding, RiskBreakdown } from "@/lib/risk"
+import type { PostureResult } from "@/lib/posture"
 import {
   AllClear,
   CodeFindingsSection,
@@ -21,6 +22,7 @@ import {
 import { RiskGauge } from "@/app/components/risk-gauge"
 import { RiskBreakdownChart } from "@/app/components/risk-breakdown"
 import { ViewToggleButton } from "@/app/components/view-toggle"
+import { PostureCard } from "@/app/components/posture-card"
 
 type ScanResultFull = ScanResult & {
   dependencies?: DependencyFinding[]
@@ -28,6 +30,7 @@ type ScanResultFull = ScanResult & {
   riskScore?: number
   riskBreakdown?: RiskBreakdown
   prioritized?: PrioritizedFinding[]
+  posture?: PostureResult
 }
 
 type PageProps = {
@@ -303,6 +306,8 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
           </p>
         </div>
       </div>
+
+      {result.posture && <PostureCard posture={result.posture} />}
 
       {meta}
 
