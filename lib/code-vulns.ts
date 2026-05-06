@@ -1,3 +1,6 @@
+// repoguard:ignore-file — this file defines SAST rules; the patterns and
+// descriptions reference the exact syntax we detect (eval, new Function,
+// dangerouslySetInnerHTML, etc.), which would otherwise match themselves.
 import type { CodeFinding, CodeVulnCategory, Severity } from "./types"
 
 type Language = "js" | "python" | "any"

@@ -1,3 +1,4 @@
+// repoguard:ignore-file — rule definitions reference the filenames we flag.
 import type { SensitiveFileFinding, SensitiveFileKind, Severity } from "./types"
 
 type FileRule = {

@@ -1,3 +1,5 @@
+<!-- repoguard:ignore-file — README documents the token formats we detect. -->
+
 # RepoGuard
 
 > Lightweight GitHub security scanner for solo devs and small teams. Live at **[repoguard-chi.vercel.app](https://repoguard-chi.vercel.app)**.
@@ -56,6 +58,20 @@ Conservative pattern rules over your JavaScript/TypeScript and Python code, each
 - **Dockerfile** — container running as root, missing `USER` directive, `:latest` base tags, `ADD http(s)://`, secrets baked into `ENV`, `RUN curl | sh`, `chmod 777`, unpinned `apt install`
 - **GitHub Actions** — `pull_request_target` checking out PR head with secrets exposed (the s1ngularity / GhostAction vector), third-party actions not pinned to a full SHA, `run:` steps interpolating `${{ github.event.* }}` fields (script injection), workflow-level `permissions: write-all`
 - **npm lifecycle scripts** — `preinstall`/`install`/`postinstall` running `curl | sh`, `base64 -d`, `eval`, `node -e`, `python -c`, or destructive `rm -rf`
+
+## Excluding files from scanning
+
+If a file legitimately contains patterns that would otherwise fire findings — a README documenting token formats, a test fixture with dummy credentials, a script that generates example configs — add a single-line directive anywhere in the first 30 lines of the file:
+
+```
+// repoguard:ignore-file           (JavaScript, TypeScript, Go, Rust, C, Java…)
+# repoguard:ignore-file            (Python, shell, YAML, Dockerfile, TOML…)
+<!-- repoguard:ignore-file -->     (Markdown, HTML)
+```
+
+The file is then skipped entirely — secrets, code vulnerabilities, entropy checks, and git-history scans all honor it.
+
+Files under `tests/`, `__tests__/`, `fixtures/`, `mocks/`, `examples/`, or with names ending in `.test.*`/`.spec.*` are already visually flagged as "Test fixture" in results without requiring the directive.
 
 ## Privacy
 
