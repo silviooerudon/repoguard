@@ -1,9 +1,11 @@
 // RepoGuard - Supply Chain Scanner
-// Foundation lib (E1) - types and orchestrator skeleton.
-// Detectors live in:
-//   - lib/supply-chain-typo.ts    (E2: typosquatting)
+// Foundation lib (E1) + typosquatting detector wired (E2).
+// Detectors:
+//   - lib/supply-chain-typo.ts    (E2: typosquatting) [WIRED]
 //   - lib/supply-chain-pi-npm.ts  (E3: postinstall content npm)
 //   - lib/supply-chain-pi-py.ts   (E4: postinstall content python)
+
+import { detectTyposquatting } from "./supply-chain-typo";
 
 export type SupplyChainSeverity = "HIGH" | "MEDIUM" | "LOW";
 
@@ -49,7 +51,6 @@ export interface SupplyChainResult {
   scanned: SupplyChainScanned;
 }
 
-// Penalty per finding severity (computeScore subtracts these from 100).
 const PENALTY: Record<SupplyChainSeverity, number> = {
   HIGH: 25,
   MEDIUM: 10,
@@ -86,7 +87,6 @@ export function buildCategoryBreakdown(
 }
 
 export interface SupplyChainScanInput {
-  // Map of file path (repo-relative, forward-slash) to raw content.
   files: Map<string, string>;
 }
 
@@ -95,7 +95,6 @@ function isManifest(path: string, manifest: string): boolean {
   return lower === manifest || lower.endsWith("/" + manifest);
 }
 
-// Main entry point. Detectors are wired in E2-E4 by appending to `findings`.
 export async function scanSupplyChain(
   input: SupplyChainScanInput,
 ): Promise<SupplyChainResult> {
@@ -104,7 +103,7 @@ export async function scanSupplyChain(
   let packageJsonCount = 0;
   let setupPyCount = 0;
   let pyprojectCount = 0;
-  const depsAnalyzed = 0;
+  let depsAnalyzed = 0;
 
   for (const [path] of input.files) {
     if (isManifest(path, "package.json")) packageJsonCount++;
@@ -112,7 +111,11 @@ export async function scanSupplyChain(
     if (isManifest(path, "pyproject.toml")) pyprojectCount++;
   }
 
-  // E2 hook: typosquatting detector
+  // E2: typosquatting detector
+  const typoResult = await detectTyposquatting(input.files);
+  findings.push(...typoResult.findings);
+  depsAnalyzed += typoResult.depsAnalyzed;
+
   // E3 hook: postinstall npm content analysis
   // E4 hook: postinstall python content analysis
 
@@ -136,7 +139,6 @@ export async function scanSupplyChain(
   };
 }
 
-// Test-only exports - extended by detector modules in E2-E4.
 export const __testHelpers = {
   computeScore,
   levelFromScore,
