@@ -309,6 +309,23 @@ function extractStatementsFromTerraform(content: string): IamStatement[] {
     extractHclStatementBlocks(body, content, statements)
   }
 
+  // Heredoc-style policies: policy = <<EOF { ... } EOF
+  // Common in aws_iam_role_policy, aws_iam_user_policy, aws_iam_policy.
+  // Supports both <<EOF and <<-EOF (indented), and any tag name (EOF, POLICY, etc.)
+  const heredocRe = /<<-?([A-Z_][A-Z0-9_]*)\s*\n([\s\S]*?)\n\s*\1\s*$/gm
+  while ((m = heredocRe.exec(content)) !== null) {
+    const inner = m[2]
+    // Heredoc bodies may contain Terraform interpolations like ${var.x}.
+    // Replace them with a JSON-safe placeholder so JSON.parse succeeds.
+    const cleaned = inner.replace(/\$\{[^}]+\}/g, "PLACEHOLDER")
+    try {
+      const parsed = JSON.parse(cleaned)
+      walkForStatements(parsed, statements, content)
+    } catch {
+      // skip blocks that are not valid JSON (e.g. shell scripts in user_data)
+    }
+  }
+
   return statements
 }
 
@@ -622,6 +639,9 @@ function detectOidcWeaknesses(
 
   return findings
 }
+
+// Test-only export. Do not use outside of scripts/smoke-iam.ts.
+export const __testExtractStatements = extractStatements
 
 // ---------- Orchestration ----------
 
