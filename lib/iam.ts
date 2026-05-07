@@ -1,4 +1,5 @@
 import { GitHubRateLimitError, parseGitHubRateLimit } from "./scan"
+import { detectPrivilegeEscalation } from "./iam-privesc"
 
 export type IAMSeverity = "critical" | "high" | "medium" | "low"
 
@@ -721,6 +722,7 @@ export async function assessIAM(
       for (const stmt of stmts) {
         findings.push(...detectOidcWeaknesses(stmt, batch[j].path))
       }
+      findings.push(...detectPrivilegeEscalation(stmts, batch[j].path))
     }
   }
 
