@@ -8,6 +8,7 @@ import {
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
 import { assessPosture } from "@/lib/posture"
+import { assessIAM } from "@/lib/iam"
 import { supabase } from "@/lib/supabase"
 import { flattenScan, scoreRepo } from "@/lib/risk"
 import { parseSuppressions, applySuppressions } from "@/lib/suppressions"
@@ -47,15 +48,16 @@ export async function POST(
       explicitBranch = body.defaultBranch
     }
   } catch {
-    // no body — scanRepo auto-detects
+    // no body - scanRepo auto-detects
   }
 
   try {
-    const [secretsResult, npmResult, pythonDeps, postureResult] = await Promise.all([
+    const [secretsResult, npmResult, pythonDeps, postureResult, iamResult] = await Promise.all([
       scanRepo(accessToken, owner, repo, explicitBranch),
       scanDependencies(owner, repo, accessToken),
       scanPythonDependencies(owner, repo, accessToken),
       assessPosture(owner, repo, accessToken),
+      assessIAM(owner, repo, accessToken),
     ])
 
     const fullResult = {
@@ -72,7 +74,7 @@ export async function POST(
 
     // Best-effort: if explicitBranch is undefined, GitHub Contents API resolves
     // to default branch independently of scanRepo's resolution. Tiny race window
-    // is acceptable for MVP — worst case is suppressions from a slightly different
+    // is acceptable for MVP - worst case is suppressions from a slightly different
     // commit, which only affects which findings get filtered (no security risk).
     // Backlog: thread commit SHA through ScanResult to eliminate the race.
     const suppressionsContent = await fetchSuppressionsFile(
@@ -104,6 +106,10 @@ export async function POST(
       posture_grade: postureResult.grade,
       posture_breakdown: postureResult.breakdown,
       posture_quick_wins: postureResult.quickWins,
+      iam_score: iamResult.score,
+      iam_level: iamResult.level,
+      iam_breakdown: iamResult.breakdown,
+      iam_findings: iamResult.findings,
     })
 
     if (dbError) {
@@ -118,6 +124,7 @@ export async function POST(
       suppressed: suppressionResult.suppressed,
       expiredSuppressionsCount: suppressionResult.expiredSuppressionsCount,
       posture: postureResult,
+      iam: iamResult,
     })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {

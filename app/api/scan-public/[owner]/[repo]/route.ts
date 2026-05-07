@@ -7,6 +7,7 @@ import {
 import { scanDependencies } from "@/lib/deps"
 import { scanPythonDependencies } from "@/lib/python-deps"
 import { assessPosture } from "@/lib/posture"
+import { assessIAM } from "@/lib/iam"
 import { flattenScan, scoreRepo } from "@/lib/risk"
 import { parseSuppressions, applySuppressions } from "@/lib/suppressions"
 import { NextResponse } from "next/server"
@@ -31,15 +32,16 @@ export async function POST(
       explicitBranch = body.defaultBranch
     }
   } catch {
-    // no body — scanRepo auto-detects
+    // no body - scanRepo auto-detects
   }
 
   try {
-    const [secretsResult, npmResult, pythonDeps, postureResult] = await Promise.all([
+    const [secretsResult, npmResult, pythonDeps, postureResult, iamResult] = await Promise.all([
       scanRepo(null, owner, repo, explicitBranch),
       scanDependencies(owner, repo, null),
       scanPythonDependencies(owner, repo, null),
       assessPosture(owner, repo, null),
+      assessIAM(owner, repo, null),
     ])
 
     const fullResult = {
@@ -55,7 +57,7 @@ export async function POST(
     const flatFindings = flattenScan(fullResult)
 
     // Best-effort: anonymous scan (no accessToken). Same race window caveat as
-    // the authenticated route — see app/api/scan/[owner]/[repo]/route.ts for
+    // the authenticated route - see app/api/scan/[owner]/[repo]/route.ts for
     // rationale.
     const suppressionsContent = await fetchSuppressionsFile(
       null,
@@ -78,6 +80,7 @@ export async function POST(
       suppressed: suppressionResult.suppressed,
       expiredSuppressionsCount: suppressionResult.expiredSuppressionsCount,
       posture: postureResult,
+      iam: iamResult,
     })
   } catch (error) {
     if (error instanceof GitHubRateLimitError) {

@@ -25,6 +25,7 @@ import { SuppressedFindingsSection } from "@/app/components/suppressed-findings-
 import { PostureCard } from "@/app/components/posture-card"
 import type { SuppressedFinding } from "@/lib/suppressions"
 import type { PostureResult } from "@/lib/posture"
+import type { IAMResult } from "@/lib/iam"
 
 type ScanResultFull = ScanResult & {
   dependencies?: DependencyFinding[]
@@ -35,6 +36,7 @@ type ScanResultFull = ScanResult & {
   suppressed?: SuppressedFinding[]
   expiredSuppressionsCount?: number
   posture?: PostureResult
+  iam?: IAMResult
 }
 
 type PageProps = {

@@ -6,6 +6,7 @@ import type { ScanResult } from "@/lib/scan"
 import type { DependencyFinding } from "@/lib/types"
 import type { PrioritizedFinding, RiskBreakdown } from "@/lib/risk"
 import type { PostureResult } from "@/lib/posture"
+import type { IAMResult } from "@/lib/iam"
 import {
   AllClear,
   CodeFindingsSection,
@@ -31,6 +32,7 @@ type ScanResultFull = ScanResult & {
   riskBreakdown?: RiskBreakdown
   prioritized?: PrioritizedFinding[]
   posture?: PostureResult
+  iam?: IAMResult
 }
 
 type PageProps = {
