@@ -23,6 +23,7 @@ import { ViewToggleButton } from "@/app/components/view-toggle"
 import { ExpiredSuppressionsBanner } from "@/app/components/expired-suppressions-banner"
 import { SuppressedFindingsSection } from "@/app/components/suppressed-findings-section"
 import { PostureCard } from "@/app/components/posture-card"
+import { IamCard } from "@/app/components/iam-card"
 import type { SuppressedFinding } from "@/lib/suppressions"
 import type { PostureResult } from "@/lib/posture"
 import type { IAMResult } from "@/lib/iam"
@@ -227,6 +228,7 @@ function ScanResultView({ result }: { result: ScanResultFull }) {
       </div>
 
       {result.posture && <PostureCard posture={result.posture} />}
+      {result.iam && <IamCard iam={result.iam} />}
 
       {meta}
 
