@@ -13,17 +13,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { detectPrivilegeEscalation } from "../lib/iam-privesc"
-
-// We need the parser internals (extractStatements is not exported).
-// Read lib/iam.ts as text, evaluate just the parser-related code path?
-// Cleaner: temporarily make extractStatements exported via a thin re-export.
-// Simplest: import the whole module via dynamic require trick.
-// For this smoke we import a local copy of the function logic.
-
-// Re-export shim: lib/iam.ts already exports computeIAMResult; we add
-// __testExtractStatements export below in a follow-up patch if needed.
-// For now we do the simplest thing: dynamic import and access via any.
-
+import { detectAdminEquivalents } from "../lib/iam-admin"
 import * as iamModule from "../lib/iam"
 
 type IamStatement = {
@@ -42,7 +32,6 @@ const extractStatements = (iamModule as unknown as {
 
 if (!extractStatements) {
   console.error("ERROR: lib/iam.ts must export __testExtractStatements for this smoke.")
-  console.error("Run: python scripts\\patch-iam-d3-1-test-export.py")
   process.exit(1)
 }
 
@@ -88,12 +77,11 @@ for (const file of files) {
   const stmts = extractStatements(content, file)
   totalStatements += stmts.length
 
-  const oidcFindings: unknown[] = []
-  // We do not have detectOidcWeaknesses exported yet; D3.1 export shim only
-  // covers extractStatements + computeIAMResult. Privesc is exported.
   const privescFindings = detectPrivilegeEscalation(stmts as IamStatement[], file)
+  const adminFindings = detectAdminEquivalents(stmts as IamStatement[], file)
+  const allFindings = [...privescFindings, ...adminFindings]
 
-  if (stmts.length === 0 && privescFindings.length === 0) continue
+  if (stmts.length === 0 && allFindings.length === 0) continue
 
   console.log(`${path.relative(root, file)}`)
   console.log(`  statements: ${stmts.length}`)
@@ -102,9 +90,9 @@ for (const file of files) {
       console.log(`    effect=${s.effect} actions=${JSON.stringify(s.actions.slice(0, 4))} resources=${JSON.stringify(s.resources.slice(0, 2))}`)
     }
   }
-  if (privescFindings.length > 0) {
-    console.log(`  privesc findings: ${privescFindings.length}`)
-    for (const f of privescFindings) {
+  if (allFindings.length > 0) {
+    console.log(`  findings: ${allFindings.length}`)
+    for (const f of allFindings) {
       console.log(`    [${f.severity}] ${f.ruleId}: ${f.ruleName}`)
       findingsByRule.set(f.ruleId, (findingsByRule.get(f.ruleId) ?? 0) + 1)
       totalFindings++
@@ -114,9 +102,9 @@ for (const file of files) {
 }
 
 console.log("=".repeat(60))
-console.log(`Total files scanned:    ${files.length}`)
-console.log(`Total statements:       ${totalStatements}`)
-console.log(`Total privesc findings: ${totalFindings}`)
+console.log(`Total files scanned:  ${files.length}`)
+console.log(`Total statements:     ${totalStatements}`)
+console.log(`Total findings:       ${totalFindings}`)
 if (findingsByRule.size > 0) {
   console.log(`\nFindings by rule:`)
   for (const [rule, count] of findingsByRule) {
