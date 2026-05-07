@@ -3,7 +3,8 @@
 // Run: npx tsx scripts/smoke-supply-chain.ts [<fixture-dir>]
 // Default fixture: ../supply-chain-fixture
 //
-// E2: asserts specific typosquatting findings against expanded fixture.
+// E2: typosquatting findings
+// E3: postinstall npm content findings
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
@@ -28,7 +29,7 @@ const SKIP_DIRS = new Set([
 
 const MAX_FILE_BYTES = 1024 * 1024;
 
-interface ExpectedFinding {
+interface ExpectedTypoFinding {
   package: string;
   target: string;
   severity: SupplyChainSeverity;
@@ -36,8 +37,13 @@ interface ExpectedFinding {
   ecosystem: "npm" | "pypi";
 }
 
-const EXPECTED_E2: ExpectedFinding[] = [
-  // npm typosquats
+interface ExpectedPiFinding {
+  hook: string;
+  pattern: string;
+  severity: SupplyChainSeverity;
+}
+
+const EXPECTED_TYPO: ExpectedTypoFinding[] = [
   {
     package: "lodahs",
     target: "lodash",
@@ -73,7 +79,6 @@ const EXPECTED_E2: ExpectedFinding[] = [
     pattern: "edit-distance-2-prefix",
     ecosystem: "npm",
   },
-  // pypi typosquats
   {
     package: "urllib33",
     target: "urllib3",
@@ -97,8 +102,15 @@ const EXPECTED_E2: ExpectedFinding[] = [
   },
 ];
 
-// These deps are legit and must NOT generate findings.
-const FORBIDDEN_PACKAGES = [
+const EXPECTED_PI: ExpectedPiFinding[] = [
+  { hook: "postinstall", pattern: "pipe-to-shell", severity: "HIGH" },
+  { hook: "prepare", pattern: "decode-and-exec", severity: "HIGH" },
+  { hook: "install", pattern: "env-exfil", severity: "HIGH" },
+  { hook: "prepublish", pattern: "network-in-hook", severity: "MEDIUM" },
+  { hook: "prerestart", pattern: "command-chain", severity: "LOW" },
+];
+
+const FORBIDDEN_TYPO_PACKAGES = [
   "axios",
   "my-internal-pkg",
   "requests",
@@ -106,6 +118,12 @@ const FORBIDDEN_PACKAGES = [
   "boto3",
   "django",
 ];
+
+// Hooks that should NOT generate any postinstall finding (benign content
+// or not part of the install lifecycle). preinstall is in the hook list
+// but its content is "node -e console.log" which matches no pattern.
+// build and test are not lifecycle hooks at all.
+const FORBIDDEN_PI_HOOKS = ["preinstall", "build", "test"];
 
 async function loadFiles(root: string): Promise<Map<string, string>> {
   const files = new Map<string, string>();
@@ -131,9 +149,9 @@ async function loadFiles(root: string): Promise<Map<string, string>> {
   return files;
 }
 
-function findingMatches(
+function typoMatches(
   f: SupplyChainFinding,
-  exp: ExpectedFinding,
+  exp: ExpectedTypoFinding,
 ): boolean {
   return (
     f.categoryId === "typosquatting" &&
@@ -142,6 +160,18 @@ function findingMatches(
     f.pattern === exp.pattern &&
     f.evidence.includes(`-> ${exp.target}`) &&
     f.evidence.includes(`ecosystem=${exp.ecosystem}`)
+  );
+}
+
+function piMatches(
+  f: SupplyChainFinding,
+  exp: ExpectedPiFinding,
+): boolean {
+  return (
+    f.categoryId === "postinstall" &&
+    f.severity === exp.severity &&
+    f.pattern === exp.pattern &&
+    f.evidence.startsWith(`hook=${exp.hook}:`)
   );
 }
 
@@ -161,75 +191,89 @@ async function main(): Promise<void> {
   console.log("");
   console.log("Findings detail:");
   for (const f of result.findings) {
-    console.log(
-      `  [${f.severity}] ${f.categoryId} ${f.pattern}: ${f.message}` +
-        (f.package ? ` (pkg=${f.package}, file=${f.file})` : ""),
-    );
+    const head =
+      `  [${f.severity}] ${f.categoryId} ${f.pattern}: ${f.message}`;
+    if (f.package) {
+      console.log(`${head} (pkg=${f.package}, file=${f.file})`);
+    } else {
+      console.log(`${head} (file=${f.file})`);
+      console.log(`        ${f.evidence}`);
+    }
   }
   console.log("");
 
   let allOk = true;
 
-  // 1. All expected findings must be present.
-  for (const exp of EXPECTED_E2) {
-    const found = result.findings.find((f) => findingMatches(f, exp));
+  // 1. Typosquat asserts.
+  for (const exp of EXPECTED_TYPO) {
+    const found = result.findings.find((f) => typoMatches(f, exp));
     if (!found) {
       console.error(
-        `MISSING: ${exp.package} -> ${exp.target} ` +
+        `MISSING typo: ${exp.package} -> ${exp.target} ` +
           `${exp.severity} ${exp.pattern} (${exp.ecosystem})`,
       );
       allOk = false;
     }
   }
 
-  // 2. Forbidden (legit) deps must NOT generate findings.
-  for (const pkg of FORBIDDEN_PACKAGES) {
-    const wrong = result.findings.find((f) => f.package === pkg);
+  // 2. Postinstall asserts.
+  for (const exp of EXPECTED_PI) {
+    const found = result.findings.find((f) => piMatches(f, exp));
+    if (!found) {
+      console.error(
+        `MISSING pi: hook=${exp.hook} pattern=${exp.pattern} severity=${exp.severity}`,
+      );
+      allOk = false;
+    }
+  }
+
+  // 3. Forbidden typosquat packages must NOT generate findings.
+  for (const pkg of FORBIDDEN_TYPO_PACKAGES) {
+    const wrong = result.findings.find(
+      (f) => f.categoryId === "typosquatting" && f.package === pkg,
+    );
     if (wrong) {
       console.error(
-        `FALSE POSITIVE: '${pkg}' is legit but flagged as ` +
+        `FALSE POSITIVE typo: '${pkg}' is legit but flagged as ` +
           `${wrong.severity} ${wrong.pattern}`,
       );
       allOk = false;
     }
   }
 
-  // 3. Minimum scan coverage sanity.
-  if (result.scanned.depsAnalyzed === 0) {
-    console.error("E2 FAIL: depsAnalyzed=0 - parsers not extracting deps");
-    allOk = false;
+  // 4. Forbidden hooks must NOT generate postinstall findings.
+  for (const hook of FORBIDDEN_PI_HOOKS) {
+    const wrong = result.findings.find(
+      (f) =>
+        f.categoryId === "postinstall" &&
+        f.evidence.startsWith(`hook=${hook}:`),
+    );
+    if (wrong) {
+      console.error(
+        `FALSE POSITIVE pi: hook=${hook} should not fire ` +
+          `(got ${wrong.severity} ${wrong.pattern})`,
+      );
+      allOk = false;
+    }
   }
 
-  // 4. No unexpected findings beyond the expected set.
-  // (Soft check - only warn, do not fail. New seed packages may trigger additional matches.)
-  const expectedKeys = new Set(
-    EXPECTED_E2.map((e) => `${e.package}::${e.target}`),
-  );
-  const unexpected = result.findings.filter(
-    (f) =>
-      f.categoryId === "typosquatting" &&
-      !expectedKeys.has(`${f.package}::${f.evidence.match(/-> ([\w\-.]+)/)?.[1]}`),
-  );
-  if (unexpected.length > 0) {
-    console.warn("");
-    console.warn(
-      `Note: ${unexpected.length} unexpected typosquat finding(s) ` +
-        `(may be from seed list updates, not necessarily a failure):`,
-    );
-    for (const f of unexpected) {
-      console.warn(`  ${f.package} - ${f.evidence}`);
-    }
+  // 5. Sanity coverage.
+  if (result.scanned.depsAnalyzed === 0) {
+    console.error("FAIL: depsAnalyzed=0 - typo parsers not extracting deps");
+    allOk = false;
   }
 
   if (!allOk) {
     console.error("");
-    console.error("E2 FAIL");
+    console.error("E3 FAIL");
     process.exit(1);
   }
 
   console.log(
-    `E2 PASS - ${EXPECTED_E2.length} expected findings present, ` +
-      `${FORBIDDEN_PACKAGES.length} legit deps not flagged, ` +
+    `E3 PASS - ${EXPECTED_TYPO.length} typo + ${EXPECTED_PI.length} ` +
+      `postinstall findings present, ` +
+      `${FORBIDDEN_TYPO_PACKAGES.length} legit deps not flagged, ` +
+      `${FORBIDDEN_PI_HOOKS.length} benign hooks not flagged, ` +
       `${result.scanned.depsAnalyzed} deps analyzed`,
   );
 }

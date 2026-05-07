@@ -1,11 +1,12 @@
 // RepoGuard - Supply Chain Scanner
-// Foundation lib (E1) + typosquatting detector wired (E2).
+// Foundation lib (E1) + typosquatting (E2) + postinstall npm (E3) wired.
 // Detectors:
 //   - lib/supply-chain-typo.ts    (E2: typosquatting) [WIRED]
-//   - lib/supply-chain-pi-npm.ts  (E3: postinstall content npm)
+//   - lib/supply-chain-pi-npm.ts  (E3: postinstall content npm) [WIRED]
 //   - lib/supply-chain-pi-py.ts   (E4: postinstall content python)
 
 import { detectTyposquatting } from "./supply-chain-typo";
+import { detectPostInstallNpm } from "./supply-chain-pi-npm";
 
 export type SupplyChainSeverity = "HIGH" | "MEDIUM" | "LOW";
 
@@ -116,7 +117,10 @@ export async function scanSupplyChain(
   findings.push(...typoResult.findings);
   depsAnalyzed += typoResult.depsAnalyzed;
 
-  // E3 hook: postinstall npm content analysis
+  // E3: postinstall npm content analysis
+  const piNpmResult = await detectPostInstallNpm(input.files);
+  findings.push(...piNpmResult.findings);
+
   // E4 hook: postinstall python content analysis
 
   const score = computeScore(findings);
