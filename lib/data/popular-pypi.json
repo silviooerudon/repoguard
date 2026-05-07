@@ -5,88 +5,328 @@
     "generatedAt": "2026-05-07",
     "expandWith": "Run scripts/refresh-popular-packages.ts to expand to top 1000 from hugovk/top-pypi-packages",
     "count": 80,
-    "note": "This seed covers historical typosquat targets (urllib3, requests, numpy, pyyaml, cryptography, etc). Detectors work against any list size."
+    "note": "SOURCE OF TRUTH for typosquatting detection. Refresh script (scripts/refresh-popular-packages.ts) is best-effort. Seed of top 80 covers all historically documented typosquat targets."
   },
   "packages": [
-    { "name": "boto3", "rank": 1 },
-    { "name": "urllib3", "rank": 2 },
-    { "name": "requests", "rank": 3 },
-    { "name": "setuptools", "rank": 4 },
-    { "name": "certifi", "rank": 5 },
-    { "name": "charset-normalizer", "rank": 6 },
-    { "name": "idna", "rank": 7 },
-    { "name": "typing-extensions", "rank": 8 },
-    { "name": "wheel", "rank": 9 },
-    { "name": "six", "rank": 10 },
-    { "name": "python-dateutil", "rank": 11 },
-    { "name": "packaging", "rank": 12 },
-    { "name": "pip", "rank": 13 },
-    { "name": "s3transfer", "rank": 14 },
-    { "name": "botocore", "rank": 15 },
-    { "name": "pyyaml", "rank": 16 },
-    { "name": "numpy", "rank": 17 },
-    { "name": "cryptography", "rank": 18 },
-    { "name": "awscli", "rank": 19 },
-    { "name": "click", "rank": 20 },
-    { "name": "pytest", "rank": 21 },
-    { "name": "jinja2", "rank": 22 },
-    { "name": "markupsafe", "rank": 23 },
-    { "name": "werkzeug", "rank": 24 },
-    { "name": "flask", "rank": 25 },
-    { "name": "django", "rank": 26 },
-    { "name": "sqlalchemy", "rank": 27 },
-    { "name": "pandas", "rank": 28 },
-    { "name": "scipy", "rank": 29 },
-    { "name": "matplotlib", "rank": 30 },
-    { "name": "scikit-learn", "rank": 31 },
-    { "name": "pillow", "rank": 32 },
-    { "name": "lxml", "rank": 33 },
-    { "name": "beautifulsoup4", "rank": 34 },
-    { "name": "soupsieve", "rank": 35 },
-    { "name": "attrs", "rank": 36 },
-    { "name": "importlib-metadata", "rank": 37 },
-    { "name": "zipp", "rank": 38 },
-    { "name": "pluggy", "rank": 39 },
-    { "name": "iniconfig", "rank": 40 },
-    { "name": "tomli", "rank": 41 },
-    { "name": "exceptiongroup", "rank": 42 },
-    { "name": "async-timeout", "rank": 43 },
-    { "name": "aiohttp", "rank": 44 },
-    { "name": "yarl", "rank": 45 },
-    { "name": "multidict", "rank": 46 },
-    { "name": "frozenlist", "rank": 47 },
-    { "name": "aiosignal", "rank": 48 },
-    { "name": "paramiko", "rank": 49 },
-    { "name": "ansible", "rank": 50 },
-    { "name": "cffi", "rank": 51 },
-    { "name": "pycparser", "rank": 52 },
-    { "name": "pyasn1", "rank": 53 },
-    { "name": "rsa", "rank": 54 },
-    { "name": "jmespath", "rank": 55 },
-    { "name": "docutils", "rank": 56 },
-    { "name": "future", "rank": 57 },
-    { "name": "pip-tools", "rank": 58 },
-    { "name": "virtualenv", "rank": 59 },
-    { "name": "tox", "rank": 60 },
-    { "name": "twine", "rank": 61 },
-    { "name": "build", "rank": 62 },
-    { "name": "hatchling", "rank": 63 },
-    { "name": "poetry", "rank": 64 },
-    { "name": "openpyxl", "rank": 65 },
-    { "name": "redis", "rank": 66 },
-    { "name": "pymongo", "rank": 67 },
-    { "name": "psycopg2", "rank": 68 },
-    { "name": "psycopg2-binary", "rank": 69 },
-    { "name": "pymysql", "rank": 70 },
-    { "name": "oauthlib", "rank": 71 },
-    { "name": "requests-oauthlib", "rank": 72 },
-    { "name": "google-auth", "rank": 73 },
-    { "name": "protobuf", "rank": 74 },
-    { "name": "grpcio", "rank": 75 },
-    { "name": "gunicorn", "rank": 76 },
-    { "name": "uvicorn", "rank": 77 },
-    { "name": "fastapi", "rank": 78 },
-    { "name": "pydantic", "rank": 79 },
-    { "name": "starlette", "rank": 80 }
+    {
+      "name": "boto3",
+      "rank": 1
+    },
+    {
+      "name": "urllib3",
+      "rank": 2
+    },
+    {
+      "name": "requests",
+      "rank": 3
+    },
+    {
+      "name": "setuptools",
+      "rank": 4
+    },
+    {
+      "name": "certifi",
+      "rank": 5
+    },
+    {
+      "name": "charset-normalizer",
+      "rank": 6
+    },
+    {
+      "name": "idna",
+      "rank": 7
+    },
+    {
+      "name": "typing-extensions",
+      "rank": 8
+    },
+    {
+      "name": "wheel",
+      "rank": 9
+    },
+    {
+      "name": "six",
+      "rank": 10
+    },
+    {
+      "name": "python-dateutil",
+      "rank": 11
+    },
+    {
+      "name": "packaging",
+      "rank": 12
+    },
+    {
+      "name": "pip",
+      "rank": 13
+    },
+    {
+      "name": "s3transfer",
+      "rank": 14
+    },
+    {
+      "name": "botocore",
+      "rank": 15
+    },
+    {
+      "name": "pyyaml",
+      "rank": 16
+    },
+    {
+      "name": "numpy",
+      "rank": 17
+    },
+    {
+      "name": "cryptography",
+      "rank": 18
+    },
+    {
+      "name": "awscli",
+      "rank": 19
+    },
+    {
+      "name": "click",
+      "rank": 20
+    },
+    {
+      "name": "pytest",
+      "rank": 21
+    },
+    {
+      "name": "jinja2",
+      "rank": 22
+    },
+    {
+      "name": "markupsafe",
+      "rank": 23
+    },
+    {
+      "name": "werkzeug",
+      "rank": 24
+    },
+    {
+      "name": "flask",
+      "rank": 25
+    },
+    {
+      "name": "django",
+      "rank": 26
+    },
+    {
+      "name": "sqlalchemy",
+      "rank": 27
+    },
+    {
+      "name": "pandas",
+      "rank": 28
+    },
+    {
+      "name": "scipy",
+      "rank": 29
+    },
+    {
+      "name": "matplotlib",
+      "rank": 30
+    },
+    {
+      "name": "scikit-learn",
+      "rank": 31
+    },
+    {
+      "name": "pillow",
+      "rank": 32
+    },
+    {
+      "name": "lxml",
+      "rank": 33
+    },
+    {
+      "name": "beautifulsoup4",
+      "rank": 34
+    },
+    {
+      "name": "soupsieve",
+      "rank": 35
+    },
+    {
+      "name": "attrs",
+      "rank": 36
+    },
+    {
+      "name": "importlib-metadata",
+      "rank": 37
+    },
+    {
+      "name": "zipp",
+      "rank": 38
+    },
+    {
+      "name": "pluggy",
+      "rank": 39
+    },
+    {
+      "name": "iniconfig",
+      "rank": 40
+    },
+    {
+      "name": "tomli",
+      "rank": 41
+    },
+    {
+      "name": "exceptiongroup",
+      "rank": 42
+    },
+    {
+      "name": "async-timeout",
+      "rank": 43
+    },
+    {
+      "name": "aiohttp",
+      "rank": 44
+    },
+    {
+      "name": "yarl",
+      "rank": 45
+    },
+    {
+      "name": "multidict",
+      "rank": 46
+    },
+    {
+      "name": "frozenlist",
+      "rank": 47
+    },
+    {
+      "name": "aiosignal",
+      "rank": 48
+    },
+    {
+      "name": "paramiko",
+      "rank": 49
+    },
+    {
+      "name": "ansible",
+      "rank": 50
+    },
+    {
+      "name": "cffi",
+      "rank": 51
+    },
+    {
+      "name": "pycparser",
+      "rank": 52
+    },
+    {
+      "name": "pyasn1",
+      "rank": 53
+    },
+    {
+      "name": "rsa",
+      "rank": 54
+    },
+    {
+      "name": "jmespath",
+      "rank": 55
+    },
+    {
+      "name": "docutils",
+      "rank": 56
+    },
+    {
+      "name": "future",
+      "rank": 57
+    },
+    {
+      "name": "pip-tools",
+      "rank": 58
+    },
+    {
+      "name": "virtualenv",
+      "rank": 59
+    },
+    {
+      "name": "tox",
+      "rank": 60
+    },
+    {
+      "name": "twine",
+      "rank": 61
+    },
+    {
+      "name": "build",
+      "rank": 62
+    },
+    {
+      "name": "hatchling",
+      "rank": 63
+    },
+    {
+      "name": "poetry",
+      "rank": 64
+    },
+    {
+      "name": "openpyxl",
+      "rank": 65
+    },
+    {
+      "name": "redis",
+      "rank": 66
+    },
+    {
+      "name": "pymongo",
+      "rank": 67
+    },
+    {
+      "name": "psycopg2",
+      "rank": 68
+    },
+    {
+      "name": "psycopg2-binary",
+      "rank": 69
+    },
+    {
+      "name": "pymysql",
+      "rank": 70
+    },
+    {
+      "name": "oauthlib",
+      "rank": 71
+    },
+    {
+      "name": "requests-oauthlib",
+      "rank": 72
+    },
+    {
+      "name": "google-auth",
+      "rank": 73
+    },
+    {
+      "name": "protobuf",
+      "rank": 74
+    },
+    {
+      "name": "grpcio",
+      "rank": 75
+    },
+    {
+      "name": "gunicorn",
+      "rank": 76
+    },
+    {
+      "name": "uvicorn",
+      "rank": 77
+    },
+    {
+      "name": "fastapi",
+      "rank": 78
+    },
+    {
+      "name": "pydantic",
+      "rank": 79
+    },
+    {
+      "name": "starlette",
+      "rank": 80
+    }
   ]
 }

@@ -1,27 +1,42 @@
 // scripts/refresh-popular-packages.ts
-// Refresh popular package lists from upstream sources.
+//
+// ============================================================================
+// STATUS (validated 2026-05-07): refresh URLs are BEST-EFFORT.
+//
+// Upon validation in E2.1, both npm sources returned 404:
+//   - https://github.com/LeoDog896/npm-rank/releases/latest/download/raw.json
+//   - https://github.com/tristan-f-r/npm-rank/releases/latest/download/raw.json
+//     (LeoDog896/npm-rank was renamed to tristan-f-r/npm-rank, but neither
+//      has a stable `latest/download/raw.json` release asset as of 2026-05.)
+//
+// PyPI source could not be validated from the build environment but is
+// believed to still be active.
+//
+// SOURCE OF TRUTH for typosquatting detection: lib/data/popular-*.json
+// The seed lists (top 100 npm + top 80 PyPI) cover all historically
+// documented typosquat targets (lodash, express, react, axios, requests,
+// urllib3, numpy, pyyaml, cryptography, etc).
+//
+// When refresh is needed (e.g. customer reports typosquat of pkg outside seed):
+//   Option A: switch npm source to `npm-high-impact` package
+//             npm install --save-dev npm-high-impact
+//             import { npmTopDownloads } from "npm-high-impact"
+//   Option B: expand seed lists manually (no external dep)
+//   Option C: use ecosyste.ms API or npms.io paginated search
+//
+// Until then, this script may fail. That is expected and not a regression.
+// ============================================================================
+//
 // Run: npx tsx scripts/refresh-popular-packages.ts
-//
-// Schedule: quarterly, or whenever a new typosquatting incident is in the news.
-//
-// Sources:
-//   - npm: https://github.com/LeoDog896/npm-rank releases (raw.json)
-//          Returns Array of Package objects ordered by popularity.
-//   - PyPI: https://hugovk.dev/top-pypi-packages/top-pypi-packages.min.json
-//          Returns { rows: [{ project, download_count }, ...] } ordered by downloads.
-//
-// Output:
-//   - lib/data/popular-npm.json   (top NPM_LIMIT)
-//   - lib/data/popular-pypi.json  (top PYPI_LIMIT)
 
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const NPM_TOP_URL =
-  "https://github.com/LeoDog896/npm-rank/releases/latest/download/raw.json";
+  "https://github.com/tristan-f-r/npm-rank/releases/latest/download/raw.json";
 
 const PYPI_TOP_URL =
-  "https://hugovk.dev/top-pypi-packages/top-pypi-packages.min.json";
+  "https://hugovk.github.io/top-pypi-packages/top-pypi-packages.min.json";
 
 const NPM_LIMIT = 5000;
 const PYPI_LIMIT = 1000;
@@ -123,12 +138,50 @@ async function refreshPyPI(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log("Refreshing popular package lists...");
-  await refreshNpm();
-  await refreshPyPI();
-  console.log("Done.");
+  console.log("(See script header for status of upstream URLs.)");
+  console.log("");
+
+  let npmOk = false;
+  let pypiOk = false;
+
+  try {
+    await refreshNpm();
+    npmOk = true;
+  } catch (err) {
+    console.error("[npm] FAILED:", err instanceof Error ? err.message : err);
+    console.error(
+      "[npm] Seed list lib/data/popular-npm.json remains source of truth.",
+    );
+  }
+
+  try {
+    await refreshPyPI();
+    pypiOk = true;
+  } catch (err) {
+    console.error("[pypi] FAILED:", err instanceof Error ? err.message : err);
+    console.error(
+      "[pypi] Seed list lib/data/popular-pypi.json remains source of truth.",
+    );
+  }
+
+  console.log("");
+  if (npmOk && pypiOk) {
+    console.log("Done. Both lists refreshed.");
+    process.exit(0);
+  } else if (npmOk || pypiOk) {
+    console.log(
+      `Partial refresh: npm=${npmOk ? "ok" : "failed"}, pypi=${pypiOk ? "ok" : "failed"}.`,
+    );
+    process.exit(0);
+  } else {
+    console.error(
+      "Refresh failed for both ecosystems. Seed lists remain source of truth.",
+    );
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {
-  console.error("Refresh failed:", err);
+  console.error("Refresh script error:", err);
   process.exit(1);
 });
